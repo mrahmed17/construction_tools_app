@@ -222,10 +222,10 @@ export default function HomeScreen() {
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => navigation.navigate('Reports' as never)}
+              onPress={() => navigation.navigate('ProductManagement' as never)}
             >
-              <MaterialIcons name="bar-chart" size={24} color="#333" />
-              <Text style={styles.actionText}>রিপোর্ট</Text>
+              <MaterialIcons name="category" size={24} color="#333" />
+              <Text style={styles.actionText}>প্রোডাক্ট ম্যানেজ</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -312,7 +312,7 @@ export default function HomeScreen() {
                 style={styles.menuItemHeader}
                 onPress={() => {
                   setMenuVisible(false);
-                  navigation.navigate('Suppliers' as never);
+                  navigation.navigate('Supplier' as never);
                 }}
               >
                 <FontAwesome5 name="truck" size={20} color="#333" />
@@ -323,16 +323,27 @@ export default function HomeScreen() {
                 style={styles.menuItemHeader}
                 onPress={() => {
                   setMenuVisible(false);
-                  navigation.navigate('PriceList' as never);
+                  navigation.navigate('PriceConfig' as never);
                 }}
               >
                 <MaterialIcons name="price-change" size={24} color="#333" />
                 <Text style={styles.menuItemText}>মূল্য তালিকা</Text>
               </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.menuItemHeader}
+                onPress={() => {
+                  setMenuVisible(false);
+                  navigation.navigate('ProductManagement' as never);
+                }}
+              >
+                <MaterialIcons name="category" size={24} color="#333" />
+                <Text style={styles.menuItemText}>প্রোডাক্ট ম্যানেজমেন্ট</Text>
+              </TouchableOpacity>
 
               <View style={styles.menuDivider} />
               
-              <Text style={styles.menuSectionTitle}>পণ্য ক্যা�tgরি</Text>
+              <Text style={styles.menuSectionTitle}>পণ্য ক্যাটাগরি</Text>
               
               <FlatList
                 data={categoryMenu}
@@ -342,22 +353,6 @@ export default function HomeScreen() {
               />
               
               <View style={styles.menuDivider} />
-              
-              <TouchableOpacity 
-                style={styles.menuItemHeader}
-                onPress={() => {
-                  setMenuVisible(false);
-                  // navigation.navigate('Settings' as never);
-                }}
-              >
-                <Ionicons name="settings-outline" size={24} color="#333" />
-                <Text style={styles.menuItemText}>সেটিংস</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.menuItemHeader}>
-                <Ionicons name="log-out-outline" size={24} color="#333" />
-                <Text style={styles.menuItemText}>লগ আউট</Text>
-              </TouchableOpacity>
             </ScrollView>
           </View>
         </TouchableOpacity>
