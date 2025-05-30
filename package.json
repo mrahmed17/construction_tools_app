@@ -22,6 +22,8 @@
     "expo": "^52.0.42",
     "expo-camera": "16.1.6",
     "expo-linear-gradient": "14.1.4",
+    "expo-status-bar": "2.2.3",
+    "firebase": "8.10.1",
     "lucide-react-native": "0.511.0",
     "react": "18.2.0",
     "react-native": "0.72.6",
