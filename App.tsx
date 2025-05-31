@@ -7,8 +7,11 @@ import ProductSelectionScreen from './screens/ProductSelectionScreen';
 import CartScreen from './screens/CartScreen';
 import StockManagementScreen from './screens/StockManagementScreen';
 import SupplierScreen from './screens/SupplierScreen';
+import AuthScreen from './screens/AuthScreen';
+import ProductManagementScreen from './screens/ProductManagementScreen';
 import PriceConfig from './components/PriceConfig';
 import { CartProvider } from './context/CartContext';
+import { AuthProvider } from './context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Drawer = createDrawerNavigator();
@@ -36,55 +39,65 @@ export default function App() {
   }, []);
 
   return (
-    <CartProvider>
-      <NavigationContainer>
-        <StatusBar style="auto" />
-        <Drawer.Navigator 
-          initialRouteName="Home"
-          screenOptions={{
-            headerStyle: {
-              backgroundColor: '#4CAF50',
-            },
-            headerTintColor: '#fff',
-            headerTitleStyle: {
-              fontWeight: 'bold',
-            },
-            drawerActiveTintColor: '#4CAF50',
-            drawerLabelStyle: {
-              fontSize: 16,
-            }
-          }}
-        >
-          <Drawer.Screen name="Home" component={HomeScreen} options={{ title: 'হোম' }} />
-          <Drawer.Screen 
-            name="ProductSelection" 
-            component={ProductSelectionScreen} 
-            options={{ title: 'পণ্য নির্বাচন করুন' }}
-          />
-          <Drawer.Screen name="Cart" component={CartScreen} options={{ title: 'কার্ট' }} />
-          <Drawer.Screen 
-            name="StockManagement" 
-            component={StockManagementScreen} 
-            options={{ title: 'স্টক ম্যানেজমেন্ট' }}
-          />
-          <Drawer.Screen 
-            name="Supplier" 
-            component={SupplierScreen} 
-            options={{ title: 'সাপ্লাইয়ার' }}
-          />
-          <Drawer.Screen 
-            name="PriceConfig" 
-            component={PriceConfig} 
-            options={{ title: 'মূল্য সেটিংস' }}
-          />
-          <Drawer.Screen 
-            name="ProductManagement" 
-            component={ProductManagementScreen} 
-            options={{ title: 'প্রোডাক্ট ম্যানেজমেন্ট' }}
-          />
-        </Drawer.Navigator>
-      </NavigationContainer>
-    </CartProvider>
+    <AuthProvider>
+      <CartProvider>
+        <NavigationContainer>
+          <StatusBar style="auto" />
+          <Drawer.Navigator 
+            initialRouteName="Auth"
+            screenOptions={{
+              headerStyle: {
+                backgroundColor: '#4CAF50',
+              },
+              headerTintColor: '#fff',
+              headerTitleStyle: {
+                fontWeight: 'bold',
+              },
+              drawerActiveTintColor: '#4CAF50',
+              drawerLabelStyle: {
+                fontSize: 16,
+              }
+            }}
+          >
+            <Drawer.Screen 
+              name="Auth" 
+              component={AuthScreen} 
+              options={{ 
+                title: 'লগইন', 
+                drawerItemStyle: { display: 'none' } 
+              }} 
+            />
+            <Drawer.Screen name="Home" component={HomeScreen} options={{ title: 'হোম' }} />
+            <Drawer.Screen 
+              name="ProductSelection" 
+              component={ProductSelectionScreen} 
+              options={{ title: 'পণ্য নির্বাচন করুন' }}
+            />
+            <Drawer.Screen name="Cart" component={CartScreen} options={{ title: 'কার্ট' }} />
+            <Drawer.Screen 
+              name="StockManagement" 
+              component={StockManagementScreen} 
+              options={{ title: 'স্টক ম্যানেজমেন্ট' }}
+            />
+            <Drawer.Screen 
+              name="Supplier" 
+              component={SupplierScreen} 
+              options={{ title: 'সাপ্লাইয়ার' }}
+            />
+            <Drawer.Screen 
+              name="PriceConfig" 
+              component={PriceConfig} 
+              options={{ title: 'মূল্য সেটিংস' }}
+            />
+            <Drawer.Screen 
+              name="ProductManagement" 
+              component={ProductManagementScreen} 
+              options={{ title: 'প্রোডাক্ট ম্যানেজমেন্ট' }}
+            />
+          </Drawer.Navigator>
+        </NavigationContainer>
+      </CartProvider>
+    </AuthProvider>
   );
 }
 

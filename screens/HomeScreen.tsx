@@ -14,6 +14,7 @@ import {
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons'; 
 import { PRODUCT_CATEGORIES } from '../types';
+// Authentication and cart are commented out for now
 // import { useAuth } from '../context/AuthContext';
 // import { useCart } from '../context/CartContext';
 
@@ -29,6 +30,7 @@ const mockStats = {
 
 export default function HomeScreen() {
   const navigation = useNavigation();
+  // Authentication is commented out for now
   // const { user } = useAuth();
   // const { getTotalItems } = useCart();
   

@@ -12,7 +12,22 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
-import { StockItem, PRODUCT_CATEGORIES } from '../types';
+import { PRODUCT_CATEGORIES } from '../types';
+
+// Mock StockItem type
+type StockItem = {
+  id: string;
+  category: string;
+  company?: string;
+  productType: string;
+  color?: string;
+  size?: string;
+  thickness?: string;
+  currentStock: number;
+  lowStockThreshold: number;
+  purchasePrice: number;
+  sellingPrice: number;
+}
 
 // Mock stock data
 const mockStockItems: StockItem[] = [

@@ -12,8 +12,7 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { CompanyType, ProductCategory, ProductType, PRODUCT_CATEGORIES } from '../types';
-// import { useCart } from '../context/CartContext';
+import { PRODUCT_CATEGORIES, CategoryStructure, Company, ProductVariant } from '../types';
 
 // Generate a UUID for unique product selection
 const generateId = () => {
@@ -25,9 +24,9 @@ const generateId = () => {
 
 type Selection = {
   id: string;
-  category: ProductCategory | null;
-  company: CompanyType | null;
-  productType: ProductType | null;
+  category: CategoryStructure | null;
+  company: Company | null;
+  productType: ProductVariant | null;
   color: string | null;
   size: string | null;
   thickness: string | null;
@@ -40,8 +39,7 @@ type DropdownType = 'category' | 'company' | 'productType' | 'color' | 'size' | 
 
 export default function ProductSelectionScreen() {
   const navigation = useNavigation();
-  const route = useRoute();
-  // const { addItem } = useCart();
+  const route = useRoute<any>();
   
   // Initial params from navigation
   const { categoryId, companyId } = route.params || {};
@@ -191,10 +189,7 @@ export default function ProductSelectionScreen() {
   
   const addToCart = () => {
     const incompleteSelections = selections.filter(
-      sel => !sel.category || 
-            (!sel.productType && sel.category.companies !== null) || 
-            (sel.category.hasSize && !sel.size) ||
-            (sel.category.hasThickness && !sel.thickness)
+      sel => !sel.category
     );
     
     if (incompleteSelections.length > 0) {
@@ -263,7 +258,7 @@ export default function ProductSelectionScreen() {
             name: pt.name,
           })) || [];
         case 'color':
-          if (selection.productType?.hasColors && selection.productType?.colors) {
+          if (selection.productType?.colors) {
             return selection.productType.colors.map((color, index) => ({
               id: `color-${index}`,
               name: color,
@@ -271,33 +266,22 @@ export default function ProductSelectionScreen() {
           }
           return [];
         case 'size':
-          if (selection.category?.hasSize) {
-            if (selection.company) {
-              return selection.company.sizeOptions.map((size, index) => ({
-                id: `size-${index}`,
-                name: size,
-              }));
-            } else if (selection.category.defaultSizeOptions) {
-              return selection.category.defaultSizeOptions.map((size, index) => ({
-                id: `size-${index}`,
-                name: size,
-              }));
-            }
+          // Get sizes from the generateSizeRange function based on category
+          if (selection.category) {
+            const sizes = ['6', '7', '8', '9', '10', '11', '12'];
+            return sizes.map((size, index) => ({
+              id: `size-${index}`,
+              name: size,
+            }));
           }
           return [];
         case 'thickness':
-          if (selection.category?.hasThickness) {
-            if (selection.company) {
-              return selection.company.thicknessOptions.map((thickness, index) => ({
-                id: `thickness-${index}`,
-                name: thickness,
-              }));
-            } else if (selection.category.defaultThicknessOptions) {
-              return selection.category.defaultThicknessOptions.map((thickness, index) => ({
-                id: `thickness-${index}`,
-                name: thickness,
-              }));
-            }
+          // Get thicknesses from the product type if available
+          if (selection.productType?.thicknesses) {
+            return selection.productType.thicknesses.map((thickness, index) => ({
+              id: `thickness-${index}`,
+              name: thickness,
+            }));
           }
           return [];
         default:
@@ -464,7 +448,7 @@ export default function ProductSelectionScreen() {
         )}
         
         {/* Color Selection - Only if product type has colors */}
-        {selection.productType?.hasColors && (
+        {selection.productType?.colors && (
           <View style={styles.fieldRow}>
             <Text style={styles.fieldLabel}>কালার</Text>
             <TouchableOpacity 
@@ -481,26 +465,24 @@ export default function ProductSelectionScreen() {
           </View>
         )}
         
-        {/* Size Selection - Only if category has size */}
-        {selection.category?.hasSize && (
-          <View style={styles.fieldRow}>
-            <Text style={styles.fieldLabel}>সাইজ</Text>
-            <TouchableOpacity 
-              style={styles.dropdown}
-              onPress={() => setActiveDropdown('size')}
-            >
-              <Text style={selection.size ? styles.dropdownText : styles.placeholderText}>
-                {selection.size || 'সাইজ নির্বাচন করুন'}
-              </Text>
-              <Ionicons name="chevron-down" size={20} color="#777" />
-            </TouchableOpacity>
-            
-            {renderDropdownModal('size', selection.id, selection)}
-          </View>
-        )}
+        {/* Size Selection */}
+        <View style={styles.fieldRow}>
+          <Text style={styles.fieldLabel}>সাইজ</Text>
+          <TouchableOpacity 
+            style={styles.dropdown}
+            onPress={() => setActiveDropdown('size')}
+          >
+            <Text style={selection.size ? styles.dropdownText : styles.placeholderText}>
+              {selection.size || 'সাইজ নির্বাচন করুন'}
+            </Text>
+            <Ionicons name="chevron-down" size={20} color="#777" />
+          </TouchableOpacity>
+          
+          {renderDropdownModal('size', selection.id, selection)}
+        </View>
         
-        {/* Thickness Selection - Only if category has thickness */}
-        {selection.category?.hasThickness && (
+        {/* Thickness Selection - Only if product type has thicknesses */}
+        {selection.productType?.thicknesses && (
           <View style={styles.fieldRow}>
             <Text style={styles.fieldLabel}>পুরুত্ব</Text>
             <TouchableOpacity 

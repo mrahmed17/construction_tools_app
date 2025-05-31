@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Modal } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Modal, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Supplier } from '../types';
-import { toast } from 'sonner-native';
+import { useNavigation } from '@react-navigation/native';
 
-interface SupplierScreenProps {
-  navigation: any;
-}
+// Define our own Supplier type since it's missing from types/index.ts
+type Supplier = {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
+  company: string;
+};
 
-export default function SupplierScreen({ navigation }: SupplierScreenProps) {
+export default function SupplierScreen() {
+  const navigation = useNavigation();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -70,17 +75,17 @@ export default function SupplierScreen({ navigation }: SupplierScreenProps) {
   // Add new supplier
   const handleAddSupplier = () => {
     if (!name.trim()) {
-      toast.error('সাপ্লাইয়ারের নাম দিন');
+      Alert.alert('Error', 'সাপ্লাইয়ারের নাম দিন');
       return;
     }
     
     if (!phone.trim()) {
-      toast.error('ফোন নম্বর দিন');
+      Alert.alert('Error', 'ফোন নম্বর দিন');
       return;
     }
     
     if (!company.trim()) {
-      toast.error('কোম্পানির নাম দিন');
+      Alert.alert('Error', 'কোম্পানির নাম দিন');
       return;
     }
     
@@ -95,7 +100,7 @@ export default function SupplierScreen({ navigation }: SupplierScreenProps) {
     setSuppliers([...suppliers, newSupplier]);
     resetForm();
     setShowAddModal(false);
-    toast.success('সাপ্লাইয়ার যোগ করা হয়েছে');
+    Alert.alert('Success', 'সাপ্লাইয়ার যোগ করা হয়েছে');
   };
 
   // Update supplier
@@ -103,17 +108,17 @@ export default function SupplierScreen({ navigation }: SupplierScreenProps) {
     if (!selectedSupplier) return;
     
     if (!name.trim()) {
-      toast.error('সাপ্লাইয়ারের নাম দিন');
+      Alert.alert('Error', 'সাপ্লাইয়ারের নাম দিন');
       return;
     }
     
     if (!phone.trim()) {
-      toast.error('ফোন নম্বর দিন');
+      Alert.alert('Error', 'ফোন নম্বর দিন');
       return;
     }
     
     if (!company.trim()) {
-      toast.error('কোম্পানির নাম দিন');
+      Alert.alert('Error', 'কোম্পানির নাম দিন');
       return;
     }
     
@@ -133,13 +138,13 @@ export default function SupplierScreen({ navigation }: SupplierScreenProps) {
     setSuppliers(updatedSuppliers);
     resetForm();
     setShowEditModal(false);
-    toast.success('সাপ্লাইয়ার আপডেট করা হয়েছে');
+    Alert.alert('Success', 'সাপ্লাইয়ার আপডেট করা হয়েছে');
   };
 
   // Delete supplier
   const handleDeleteSupplier = (id: string) => {
     setSuppliers(suppliers.filter(supplier => supplier.id !== id));
-    toast.success('সাপ্লাইয়ার মুছে ফেলা হয়েছে');
+    Alert.alert('Success', 'সাপ্লাইয়ার মুছে ফেলা হয়েছে');
   };
 
   // Reset form fields
