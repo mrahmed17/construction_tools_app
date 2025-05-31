@@ -1,7 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Modal, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  Modal,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SupplierType } from '../types';
 
 // Define our own Supplier type since it's missing from types/index.ts
 type Supplier = {
@@ -13,428 +27,392 @@ type Supplier = {
 };
 
 export default function SupplierScreen() {
-  const navigation = useNavigation();
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [suppliers, setSuppliers] = useState<SupplierType[]>([]);
+  const [filteredSuppliers, setFilteredSuppliers] = useState<SupplierType[]>([]);
+  const [searchText, setSearchText] = useState('');
+  const [loading, setLoading] = useState(true);
   
-  // Form fields
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('');
-  const [company, setCompany] = useState('');
-
-  // Load mock data
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState<SupplierType | null>(null);
+  const [supplierName, setSupplierName] = useState('');
+  const [supplierPhone, setSupplierPhone] = useState('');
+  const [supplierAddress, setSupplierAddress] = useState('');
+  const [supplierEmail, setSupplierEmail] = useState('');
+  const [supplierNotes, setSupplierNotes] = useState('');
+  
+  // Load suppliers on component mount
   useEffect(() => {
-    const mockSuppliers: Supplier[] = [
-      {
-        id: '1',
-        name: 'আব্দুল করিম',
-        phone: '01712345678',
-        address: 'মিরপুর ১০, ঢাকা',
-        company: 'PHP'
-      },
-      {
-        id: '2',
-        name: 'মনজুর রহমান',
-        phone: '01923456789',
-        address: 'গুলশান ২, ঢাকা',
-        company: 'KY'
-      },
-      {
-        id: '3',
-        name: 'জাহিদ হাসান',
-        phone: '01834567890',
-        address: 'আদাবর, ঢাকা',
-        company: 'ABUL Khair'
-      },
-      {
-        id: '4',
-        name: 'রফিকুল ইসলাম',
-        phone: '01645678901',
-        address: 'সাভার, ঢাকা',
-        company: 'TK (G)'
-      },
-    ];
-    
-    setSuppliers(mockSuppliers);
+    loadSuppliers();
   }, []);
-
-  // Filter suppliers based on search
-  const filteredSuppliers = suppliers.filter(supplier => {
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      supplier.name.toLowerCase().includes(searchLower) ||
-      supplier.company.toLowerCase().includes(searchLower) ||
-      supplier.phone.includes(searchQuery)
-    );
-  });
-
-  // Add new supplier
-  const handleAddSupplier = () => {
-    if (!name.trim()) {
-      Alert.alert('Error', 'সাপ্লাইয়ারের নাম দিন');
-      return;
-    }
-    
-    if (!phone.trim()) {
-      Alert.alert('Error', 'ফোন নম্বর দিন');
-      return;
-    }
-    
-    if (!company.trim()) {
-      Alert.alert('Error', 'কোম্পানির নাম দিন');
-      return;
-    }
-    
-    const newSupplier: Supplier = {
-      id: Date.now().toString(),
-      name: name.trim(),
-      phone: phone.trim(),
-      address: address.trim(),
-      company: company.trim()
-    };
-    
-    setSuppliers([...suppliers, newSupplier]);
-    resetForm();
-    setShowAddModal(false);
-    Alert.alert('Success', 'সাপ্লাইয়ার যোগ করা হয়েছে');
-  };
-
-  // Update supplier
-  const handleUpdateSupplier = () => {
-    if (!selectedSupplier) return;
-    
-    if (!name.trim()) {
-      Alert.alert('Error', 'সাপ্লাইয়ারের নাম দিন');
-      return;
-    }
-    
-    if (!phone.trim()) {
-      Alert.alert('Error', 'ফোন নম্বর দিন');
-      return;
-    }
-    
-    if (!company.trim()) {
-      Alert.alert('Error', 'কোম্পানির নাম দিন');
-      return;
-    }
-    
-    const updatedSuppliers = suppliers.map(supplier => {
-      if (supplier.id === selectedSupplier.id) {
-        return {
-          ...supplier,
-          name: name.trim(),
-          phone: phone.trim(),
-          address: address.trim(),
-          company: company.trim()
-        };
+  
+  // Filter suppliers when search text changes
+  useEffect(() => {
+    filterSuppliers();
+  }, [searchText, suppliers]);
+  
+  // Load suppliers from storage
+  const loadSuppliers = async () => {
+    try {
+      setLoading(true);
+      const suppliersJson = await AsyncStorage.getItem('suppliers');
+      
+      if (suppliersJson) {
+        const loadedSuppliers: SupplierType[] = JSON.parse(suppliersJson);
+        setSuppliers(loadedSuppliers);
+      } else {
+        setSuppliers([]);
       }
-      return supplier;
-    });
+    } catch (error) {
+      console.error('Error loading suppliers:', error);
+      Alert.alert('Error', 'Failed to load supplier data');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Filter suppliers based on search text
+  const filterSuppliers = () => {
+    if (!searchText) {
+      setFilteredSuppliers(suppliers);
+      return;
+    }
     
-    setSuppliers(updatedSuppliers);
-    resetForm();
-    setShowEditModal(false);
-    Alert.alert('Success', 'সাপ্লাইয়ার আপডেট করা হয়েছে');
+    const lowerCaseSearch = searchText.toLowerCase();
+    const filtered = suppliers.filter(s => 
+      (s.name && s.name.toLowerCase().includes(lowerCaseSearch)) ||
+      (s.phone && s.phone.includes(searchText)) ||
+      (s.address && s.address.toLowerCase().includes(lowerCaseSearch))
+    );
+    
+    setFilteredSuppliers(filtered);
   };
-
+  
+  // Save supplier to storage
+  const saveSupplier = async (supplier: SupplierType) => {
+    try {
+      let updatedSuppliers;
+      
+      if (editingSupplier) {
+        // Update existing supplier
+        updatedSuppliers = suppliers.map(s => 
+          s.id === supplier.id ? supplier : s
+        );
+      } else {
+        // Add new supplier
+        updatedSuppliers = [...suppliers, supplier];
+      }
+      
+      setSuppliers(updatedSuppliers);
+      await AsyncStorage.setItem('suppliers', JSON.stringify(updatedSuppliers));
+      
+      Alert.alert('Success', editingSupplier 
+        ? 'সাপ্লাইয়ার আপডেট হয়েছে'
+        : 'নতুন সাপ্লাইয়ার যোগ হয়েছে'
+      );
+      
+      // Reset form and close modal
+      resetFormAndCloseModal();
+      
+    } catch (error) {
+      console.error('Error saving supplier:', error);
+      Alert.alert('Error', 'সাপ্লাইয়ার সেভ করতে ত্রুটি হয়েছে');
+    }
+  };
+  
   // Delete supplier
-  const handleDeleteSupplier = (id: string) => {
-    setSuppliers(suppliers.filter(supplier => supplier.id !== id));
-    Alert.alert('Success', 'সাপ্লাইয়ার মুছে ফেলা হয়েছে');
+  const deleteSupplier = async (id: string) => {
+    Alert.alert(
+      'নিশ্চিত করুন',
+      'আপনি কি এই সাপ্লাইয়ার মুছে ফেলতে চান?',
+      [
+        { text: 'বাতিল', style: 'cancel' },
+        {
+          text: 'মুছে ফেলুন',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const updatedSuppliers = suppliers.filter(s => s.id !== id);
+              setSuppliers(updatedSuppliers);
+              await AsyncStorage.setItem('suppliers', JSON.stringify(updatedSuppliers));
+              Alert.alert('Success', 'সাপ্লাইয়ার মুছে ফেলা হয়েছে');
+            } catch (error) {
+              console.error('Error deleting supplier:', error);
+              Alert.alert('Error', 'সাপ্লাইয়ার মুছতে ত্রুটি হয়েছে');
+            }
+          }
+        }
+      ]
+    );
   };
-
+  
+  // Open modal for adding new supplier
+  const openAddSupplierModal = () => {
+    setEditingSupplier(null);
+    resetForm();
+    setIsModalVisible(true);
+  };
+  
+  // Open modal for editing existing supplier
+  const openEditSupplierModal = (supplier: SupplierType) => {
+    setEditingSupplier(supplier);
+    setSupplierName(supplier.name);
+    setSupplierPhone(supplier.phone);
+    setSupplierAddress(supplier.address);
+    setSupplierEmail(supplier.email || '');
+    setSupplierNotes(supplier.notes || '');
+    setIsModalVisible(true);
+  };
+  
   // Reset form fields
   const resetForm = () => {
-    setName('');
-    setPhone('');
-    setAddress('');
-    setCompany('');
-    setSelectedSupplier(null);
+    setSupplierName('');
+    setSupplierPhone('');
+    setSupplierAddress('');
+    setSupplierEmail('');
+    setSupplierNotes('');
   };
-
-  // Open edit modal with selected supplier data
-  const openEditModal = (supplier: Supplier) => {
-    setSelectedSupplier(supplier);
-    setName(supplier.name);
-    setPhone(supplier.phone);
-    setAddress(supplier.address);
-    setCompany(supplier.company);
-    setShowEditModal(true);
+  
+  // Reset form and close modal
+  const resetFormAndCloseModal = () => {
+    resetForm();
+    setIsModalVisible(false);
+    setEditingSupplier(null);
   };
-
+  
+  // Handle submit for add/edit supplier
+  const handleSubmit = () => {
+    if (!validateForm()) return;
+    
+    const supplier: SupplierType = {
+      id: editingSupplier ? editingSupplier.id : Date.now().toString(),
+      name: supplierName,
+      phone: supplierPhone,
+      address: supplierAddress,
+      email: supplierEmail || undefined,
+      notes: supplierNotes || undefined,
+      unpaidAmount: editingSupplier ? editingSupplier.unpaidAmount : 0,
+      lastPurchaseDate: editingSupplier ? editingSupplier.lastPurchaseDate : undefined
+    };
+    
+    saveSupplier(supplier);
+  };
+  
+  // Validate form before saving
+  const validateForm = () => {
+    if (!supplierName.trim()) {
+      Alert.alert('Error', 'সাপ্লাইয়ারের নাম প্রবেশ করুন');
+      return false;
+    }
+    
+    if (!supplierPhone.trim()) {
+      Alert.alert('Error', 'সাপ্লাইয়ারের ফোন নম্বর প্রবেশ করুন');
+      return false;
+    }
+    
+    if (!supplierAddress.trim()) {
+      Alert.alert('Error', 'সাপ্লাইয়ারের ঠিকানা প্রবেশ করুন');
+      return false;
+    }
+    
+    return true;
+  };
+  
+  // Render each supplier item in the list
+  const renderSupplierItem = ({ item }: { item: SupplierType }) => {
+    return (
+      <View style={styles.supplierItem}>
+        <TouchableOpacity
+          style={styles.supplierInfo}
+          onPress={() => openEditSupplierModal(item)}
+        >
+          <Text style={styles.supplierName}>{item.name}</Text>
+          <Text style={styles.supplierDetail}>
+            <Ionicons name="call-outline" size={14} color="#4A6572" /> {item.phone}
+          </Text>
+          <Text style={styles.supplierDetail}>
+            <Ionicons name="location-outline" size={14} color="#4A6572" /> {item.address}
+          </Text>
+          {item.email && (
+            <Text style={styles.supplierDetail}>
+              <Ionicons name="mail-outline" size={14} color="#4A6572" /> {item.email}
+            </Text>
+          )}
+          {item.unpaidAmount > 0 && (
+            <Text style={styles.unpaidAmount}>
+              বাকি: ৳{item.unpaidAmount.toFixed(2)}
+            </Text>
+          )}
+        </TouchableOpacity>
+        
+        <View style={styles.supplierActions}>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => openEditSupplierModal(item)}
+          >
+            <Ionicons name="create-outline" size={20} color="#4A6572" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => deleteSupplier(item.id)}
+          >
+            <Ionicons name="trash-outline" size={20} color="#E57373" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+  
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>সাপ্লাইয়ার তালিকা</Text>
-        <TouchableOpacity onPress={() => setShowAddModal(true)}>
-          <Ionicons name="add-circle" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Search */}
+      {/* Search bar */}
       <View style={styles.searchContainer}>
         <View style={styles.searchInputContainer}>
-          <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+          <Ionicons name="search-outline" size={20} color="#666" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
+            value={searchText}
+            onChangeText={setSearchText}
             placeholder="সাপ্লাইয়ার অনুসন্ধান করুন..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
           />
-          {searchQuery ? (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
+          {searchText ? (
+            <TouchableOpacity onPress={() => setSearchText('')} style={styles.clearButton}>
               <Ionicons name="close-circle" size={20} color="#666" />
             </TouchableOpacity>
           ) : null}
         </View>
       </View>
-
-      {/* Suppliers List */}
-      <FlatList
-        contentContainerStyle={styles.listContent}
-        data={filteredSuppliers}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
+      
+      {/* Supplier list */}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#344955" />
+          <Text style={styles.loadingText}>Loading suppliers...</Text>
+        </View>
+      ) : filteredSuppliers.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="people-outline" size={60} color="#ccc" />
+          <Text style={styles.emptyText}>
+            {searchText ? 'কোন সাপ্লাইয়ার পাওয়া যায়নি' : 'কোন সাপ্লাইয়ার নেই'}
+          </Text>
           <TouchableOpacity 
-            style={styles.supplierCard}
-            onPress={() => openEditModal(item)}
+            style={styles.addSupplierButton}
+            onPress={openAddSupplierModal}
           >
-            <View style={styles.supplierInfo}>
-              <Text style={styles.supplierName}>{item.name}</Text>
-              <Text style={styles.supplierCompany}>{item.company}</Text>
-              <View style={styles.contactInfo}>
-                <View style={styles.contactItem}>
-                  <Ionicons name="call" size={14} color="#666" />
-                  <Text style={styles.contactText}>{item.phone}</Text>
-                </View>
-                {item.address && (
-                  <View style={styles.contactItem}>
-                    <Ionicons name="location" size={14} color="#666" />
-                    <Text style={styles.contactText}>{item.address}</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-            <View style={styles.actionButtons}>
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.callButton]}
-                onPress={() => {/* TODO: Handle phone call */}}
-              >
-                <Ionicons name="call" size={16} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.editButton]}
-                onPress={() => openEditModal(item)}
-              >
-                <Ionicons name="create" size={16} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.deleteButton]}
-                onPress={() => handleDeleteSupplier(item.id)}
-              >
-                <Ionicons name="trash" size={16} color="#fff" />
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.addSupplierButtonText}>নতুন সাপ্লাইয়ার যোগ করুন</Text>
           </TouchableOpacity>
-        )}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="people-outline" size={64} color="#BDBDBD" />
-            <Text style={styles.emptyTitle}>কোন সাপ্লাইয়ার পাওয়া যায়নি</Text>
-            <Text style={styles.emptySubtitle}>
-              {searchQuery ? 'অনুসন্ধান পরিবর্তন করুন' : 'সাপ্লাইয়ার যোগ করতে "+" বাটনে ক্লিক করুন'}
-            </Text>
-          </View>
-        }
-      />
-
-      {/* Add Supplier Modal */}
-      <Modal
-        visible={showAddModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowAddModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>নতুন সাপ্লাইয়ার যোগ করুন</Text>
-              <TouchableOpacity onPress={() => {
-                resetForm();
-                setShowAddModal(false);
-              }}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.modalBody}>
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>সাপ্লাইয়ারের নাম *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="নাম লিখুন"
-                />
-              </View>
-              
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>ফোন নম্বর *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={phone}
-                  onChangeText={setPhone}
-                  placeholder="ফোন নম্বর লিখুন"
-                  keyboardType="phone-pad"
-                />
-              </View>
-              
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>ঠিকানা</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  value={address}
-                  onChangeText={setAddress}
-                  placeholder="ঠিকানা লিখুন"
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-              
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>কোম্পানি *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={company}
-                  onChangeText={setCompany}
-                  placeholder="কোম্পানির নাম লিখুন"
-                />
-              </View>
-            </View>
-            
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => {
-                  resetForm();
-                  setShowAddModal(false);
-                }}
-              >
-                <Text style={styles.cancelButtonText}>বাতিল</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={styles.confirmButton}
-                onPress={handleAddSupplier}
-              >
-                <Text style={styles.confirmButtonText}>যোগ করুন</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
         </View>
-      </Modal>
-
-      {/* Edit Supplier Modal */}
-      <Modal
-        visible={showEditModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowEditModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>সাপ্লাইয়ার আপডেট করুন</Text>
-              <TouchableOpacity onPress={() => {
-                resetForm();
-                setShowEditModal(false);
-              }}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.modalBody}>
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>সাপ্লাইয়ারের নাম *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="নাম লিখুন"
-                />
-              </View>
-              
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>ফোন নম্বর *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={phone}
-                  onChangeText={setPhone}
-                  placeholder="ফোন নম্বর লিখুন"
-                  keyboardType="phone-pad"
-                />
-              </View>
-              
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>ঠিকানা</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  value={address}
-                  onChangeText={setAddress}
-                  placeholder="ঠিকানা লিখুন"
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-              
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>কোম্পানি *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={company}
-                  onChangeText={setCompany}
-                  placeholder="কোম্পানির নাম লিখুন"
-                />
-              </View>
-            </View>
-            
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => {
-                  resetForm();
-                  setShowEditModal(false);
-                }}
-              >
-                <Text style={styles.cancelButtonText}>বাতিল</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={styles.confirmButton}
-                onPress={handleUpdateSupplier}
-              >
-                <Text style={styles.confirmButtonText}>আপডেট করুন</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
+      ) : (
+        <FlatList
+          data={filteredSuppliers}
+          renderItem={renderSupplierItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.supplierList}
+        />
+      )}
+      
       {/* Floating Action Button */}
       <TouchableOpacity 
-        style={styles.fab}
-        onPress={() => setShowAddModal(true)}
+        style={styles.fabButton}
+        onPress={openAddSupplierModal}
       >
-        <Ionicons name="person-add" size={24} color="#fff" />
+        <Ionicons name="add" size={24} color="#fff" />
       </TouchableOpacity>
+      
+      {/* Add/Edit Modal */}
+      <Modal
+        visible={isModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={resetFormAndCloseModal}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {editingSupplier ? 'সাপ্লাইয়ার আপডেট করুন' : 'নতুন সাপ্লাইয়ার যোগ করুন'}
+              </Text>
+              <TouchableOpacity onPress={resetFormAndCloseModal}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.modalScrollView}>
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>নাম *</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={supplierName}
+                  onChangeText={setSupplierName}
+                  placeholder="সাপ্লাইয়ারের নাম"
+                />
+              </View>
+              
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>ফোন নম্বর *</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={supplierPhone}
+                  onChangeText={setSupplierPhone}
+                  placeholder="সাপ্লাইয়ারের ফোন নম্বর"
+                  keyboardType="phone-pad"
+                />
+              </View>
+              
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>ঠিকানা *</Text>
+                <TextInput
+                  style={[styles.formInput, styles.multilineInput]}
+                  value={supplierAddress}
+                  onChangeText={setSupplierAddress}
+                  placeholder="সাপ্লাইয়ারের ঠিকানা"
+                  multiline
+                />
+              </View>
+              
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>ইমেইল (ঐচ্ছিক)</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={supplierEmail}
+                  onChangeText={setSupplierEmail}
+                  placeholder="সাপ্লাইয়ারের ইমেইল"
+                  keyboardType="email-address"
+                />
+              </View>
+              
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>নোট (ঐচ্ছিক)</Text>
+                <TextInput
+                  style={[styles.formInput, styles.multilineInput]}
+                  value={supplierNotes}
+                  onChangeText={setSupplierNotes}
+                  placeholder="সাপ্লাইয়ার সম্পর্কে অতিরিক্ত তথ্য"
+                  multiline
+                />
+              </View>
+            </ScrollView>
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={resetFormAndCloseModal}
+              >
+                <Text style={styles.cancelButtonText}>বাতিল</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.saveButton}
+                onPress={handleSubmit}
+              >
+                <Text style={styles.saveButtonText}>সংরক্ষণ করুন</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -442,205 +420,215 @@ export default function SupplierScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  header: {
-    backgroundColor: '#1976D2',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: 50,
-  },
-  headerTitle: {
-    flex: 1,
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    backgroundColor: '#F5F7FA',
   },
   searchContainer: {
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
+    borderBottomColor: '#eee',
   },
   searchInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 20,
-    paddingHorizontal: 12,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
   },
   searchIcon: {
-    marginRight: 8,
+    paddingLeft: 10,
   },
   searchInput: {
     flex: 1,
-    height: 40,
+    padding: 10,
     fontSize: 16,
   },
-  listContent: {
+  clearButton: {
+    padding: 10,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 20,
+  },
+  addSupplierButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 4,
+  },
+  addSupplierButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  supplierList: {
     padding: 16,
   },
-  supplierCard: {
-    backgroundColor: '#fff',
+  supplierItem: {
+    backgroundColor: 'white',
     borderRadius: 8,
     padding: 16,
     marginBottom: 12,
     flexDirection: 'row',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
     elevation: 2,
   },
   supplierInfo: {
     flex: 1,
   },
   supplierName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#344955',
+    marginBottom: 6,
+  },
+  supplierDetail: {
+    fontSize: 14,
+    color: '#4A6572',
     marginBottom: 4,
   },
-  supplierCompany: {
+  unpaidAmount: {
     fontSize: 14,
-    color: '#1976D2',
-    marginBottom: 8,
+    fontWeight: '600',
+    color: '#E57373',
+    marginTop: 4,
   },
-  contactInfo: {
-    gap: 4,
-  },
-  contactItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  contactText: {
-    fontSize: 12,
-    color: '#666',
-  },
-  actionButtons: {
-    gap: 8,
-    justifyContent: 'center',
-  },
-  actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  callButton: {
-    backgroundColor: '#4CAF50',
+  supplierActions: {
+    justifyContent: 'space-around',
   },
   editButton: {
-    backgroundColor: '#FF9800',
+    padding: 8,
   },
   deleteButton: {
-    backgroundColor: '#F44336',
+    padding: 8,
   },
-  fab: {
+  fabButton: {
     position: 'absolute',
-    bottom: 16,
-    right: 16,
+    bottom: 20,
+    right: 20,
+    backgroundColor: '#4CAF50',
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#1976D2',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 16,
-  },
-  emptySubtitle: {
-    color: '#666',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  modalOverlay: {
+  modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    backgroundColor: '#fff',
-    width: '90%',
-    borderRadius: 12,
-    overflow: 'hidden',
+    backgroundColor: 'white',
+    margin: 20,
+    borderRadius: 8,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   modalHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
+    borderBottomColor: '#eee',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#344955',
   },
-  modalBody: {
+  modalScrollView: {
     padding: 16,
   },
-  inputContainer: {
+  formGroup: {
     marginBottom: 16,
   },
-  inputLabel: {
+  formLabel: {
     fontSize: 14,
-    color: '#333',
-    marginBottom: 8,
+    color: '#4A6572',
+    marginBottom: 4,
   },
-  input: {
+  formInput: {
+    backgroundColor: '#f9f9f9',
     borderWidth: 1,
-    borderColor: '#DDDDDD',
+    borderColor: '#ddd',
     borderRadius: 4,
     padding: 10,
     fontSize: 16,
   },
-  textArea: {
+  multilineInput: {
     height: 80,
     textAlignVertical: 'top',
   },
-  modalFooter: {
+  modalActions: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#EEEEEE',
+    borderTopColor: '#eee',
   },
   cancelButton: {
-    flex: 1,
+    backgroundColor: '#f5f5f5',
     paddingVertical: 12,
-    alignItems: 'center',
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#DDDDDD',
+    paddingHorizontal: 16,
     borderRadius: 4,
+    width: '48%',
+    alignItems: 'center',
   },
   cancelButtonText: {
-    color: '#333',
-    fontWeight: 'bold',
+    fontSize: 16,
+    color: '#666',
   },
-  confirmButton: {
-    flex: 1,
+  saveButton: {
+    backgroundColor: '#4CAF50',
     paddingVertical: 12,
-    alignItems: 'center',
-    backgroundColor: '#1976D2',
+    paddingHorizontal: 16,
     borderRadius: 4,
-    marginLeft: 8,
+    width: '48%',
+    alignItems: 'center',
   },
-  confirmButtonText: {
-    color: '#fff',
+  saveButtonText: {
+    fontSize: 16,
     fontWeight: 'bold',
+    color: 'white',
   },
 });

@@ -1,586 +1,464 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
-  Modal,
+  TouchableOpacity,
   FlatList,
-  TextInput,
-  Alert
+  Alert,
+  ActivityIndicator,
+  TextInput
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { PRODUCT_CATEGORIES, CategoryStructure, Company, ProductVariant } from '../types';
-
-// Generate a UUID for unique product selection
-const generateId = () => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-};
-
-type Selection = {
-  id: string;
-  category: CategoryStructure | null;
-  company: Company | null;
-  productType: ProductVariant | null;
-  color: string | null;
-  size: string | null;
-  thickness: string | null;
-  quantity: number;
-  purchasePrice: number;
-  sellingPrice: number;
-};
-
-type DropdownType = 'category' | 'company' | 'productType' | 'color' | 'size' | 'thickness';
+import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import { Picker } from '@react-native-picker/picker';
+import { PRODUCT_CATEGORIES, CategoryStructure, Company, ProductVariant, generateSizeRange } from '../types';
+import { useCart } from '../context/CartContext';
 
 export default function ProductSelectionScreen() {
   const navigation = useNavigation();
-  const route = useRoute<any>();
+  const { addItem } = useCart();
   
-  // Initial params from navigation
-  const { categoryId, companyId } = route.params || {};
+  // Selection states
+  const [selectedCategory, setSelectedCategory] = useState<CategoryStructure | null>(null);
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [selectedProductType, setSelectedProductType] = useState<ProductVariant | null>(null);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [selectedThickness, setSelectedThickness] = useState<string | null>(null);
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [quantity, setQuantity] = useState<number>(1);
+  const [buyPrice, setBuyPrice] = useState<string>('');
+  const [sellPrice, setSellPrice] = useState<string>('');
   
-  // State for dropdowns
-  const [activeDropdown, setActiveDropdown] = useState<DropdownType | null>(null);
+  // Selected products list for current session
+  const [selectedProducts, setSelectedProducts] = useState<any[]>([]);
   
-  // State for product selections
-  const [selections, setSelections] = useState<Selection[]>([
-    {
-      id: generateId(),
-      category: null,
-      company: null,
-      productType: null,
-      color: null,
-      size: null,
-      thickness: null,
-      quantity: 1,
-      purchasePrice: 0,
-      sellingPrice: 0
-    }
-  ]);
-  
-  // Set initial selection based on navigation params
+  // Reset dependent selections when a higher-level selection changes
   useEffect(() => {
-    if (categoryId) {
-      const category = PRODUCT_CATEGORIES.find(cat => cat.id === categoryId) || null;
-      
-      if (category) {
-        let company = null;
-        if (companyId && category.companies) {
-          company = category.companies.find(comp => comp.id === companyId) || null;
-        }
-        
-        setSelections([
-          {
-            id: generateId(),
-            category,
-            company,
-            productType: null,
-            color: null,
-            size: null,
-            thickness: null,
-            quantity: 1,
-            purchasePrice: 0,
-            sellingPrice: 0
-          }
-        ]);
-      }
+    if (selectedCategory) {
+      setSelectedCompany(null);
+      setSelectedProductType(null);
+      setSelectedColor(null);
+      setSelectedThickness(null);
+      setSelectedSize(null);
     }
-  }, [categoryId, companyId]);
+  }, [selectedCategory]);
   
-  const updateSelection = useCallback((id: string, field: keyof Selection, value: any) => {
-    setSelections(prev => 
-      prev.map(sel => {
-        if (sel.id === id) {
-          // Reset dependent fields when parent field changes
-          if (field === 'category') {
-            return { 
-              ...sel, 
-              [field]: value, 
-              company: null,
-              productType: null,
-              color: null,
-              size: null,
-              thickness: null
-            };
-          }
-          
-          if (field === 'company') {
-            return { 
-              ...sel, 
-              [field]: value, 
-              productType: null,
-              color: null,
-              size: null,
-              thickness: null
-            };
-          }
-          
-          if (field === 'productType') {
-            return { 
-              ...sel, 
-              [field]: value, 
-              color: null,
-              size: null,
-              thickness: null
-            };
-          }
-          
-          // Just update the field for other cases
-          return { ...sel, [field]: value };
-        }
-        return sel;
-      })
-    );
-  }, []);
-  
-  const addNewSelection = () => {
-    const newSelection: Selection = {
-      id: generateId(),
-      category: null,
-      company: null,
-      productType: null,
-      color: null,
-      size: null,
-      thickness: null,
-      quantity: 1,
-      purchasePrice: 0,
-      sellingPrice: 0
-    };
-    setSelections(prev => [...prev, newSelection]);
-  };
-  
-  const removeSelection = (id: string) => {
-    if (selections.length === 1) {
-      Alert.alert('নোটিশ', 'অন্তত একটি আইটেম রাখতে হবে');
-      return;
+  useEffect(() => {
+    if (selectedCompany) {
+      setSelectedProductType(null);
+      setSelectedColor(null);
+      setSelectedThickness(null);
+      setSelectedSize(null);
     }
-    setSelections(prev => prev.filter(sel => sel.id !== id));
+  }, [selectedCompany]);
+  
+  useEffect(() => {
+    if (selectedProductType) {
+      setSelectedColor(null);
+      setSelectedThickness(null);
+      setSelectedSize(null);
+    }
+  }, [selectedProductType]);
+  
+  // Calculate profit amount
+  const calculateProfit = () => {
+    const buy = parseFloat(buyPrice) || 0;
+    const sell = parseFloat(sellPrice) || 0;
+    return (sell - buy) * quantity;
   };
   
-  const increaseQuantity = (id: string) => {
-    setSelections(prev => 
-      prev.map(sel => 
-        sel.id === id ? { ...sel, quantity: sel.quantity + 1 } : sel
-      )
-    );
-  };
-  
-  const decreaseQuantity = (id: string) => {
-    setSelections(prev => 
-      prev.map(sel => 
-        sel.id === id && sel.quantity > 1 ? { ...sel, quantity: sel.quantity - 1 } : sel
-      )
-    );
-  };
-  
-  const updatePrice = (id: string, type: 'purchasePrice' | 'sellingPrice', value: string) => {
-    const numValue = parseFloat(value) || 0;
-    setSelections(prev => 
-      prev.map(sel => 
-        sel.id === id ? { ...sel, [type]: numValue } : sel
-      )
-    );
-  };
-  
-  const addToCart = () => {
-    const incompleteSelections = selections.filter(
-      sel => !sel.category
-    );
-    
-    if (incompleteSelections.length > 0) {
-      Alert.alert('অসম্পূর্ণ নির্বাচন', 'সকল প্রয়োজনীয় ফিল্ড পূরণ করুন।');
+  // Add current selection to cart
+  const handleAddToSelection = () => {
+    if (!validateSelection()) {
       return;
     }
     
-    const selectionsMissingPrice = selections.filter(
-      sel => sel.purchasePrice <= 0 || sel.sellingPrice <= 0
-    );
+    const newProduct = {
+      id: new Date().getTime().toString(),
+      category: selectedCategory?.name,
+      company: selectedCompany?.name,
+      product: selectedProductType?.name,
+      color: selectedColor,
+      thickness: selectedThickness,
+      size: selectedSize,
+      quantity,
+      purchasePrice: parseFloat(buyPrice),
+      sellingPrice: parseFloat(sellPrice),
+      profit: calculateProfit()
+    };
     
-    if (selectionsMissingPrice.length > 0) {
-      Alert.alert('মূল্য অনুপস্থিত', 'সকল আইটেমের ক্রয় ও বিক্রয় মূল্য দিন।');
+    setSelectedProducts([...selectedProducts, newProduct]);
+    
+    // Reset form for next selection
+    setSelectedColor(null);
+    setSelectedThickness(null);
+    setSelectedSize(null);
+    setQuantity(1);
+    setBuyPrice('');
+    setSellPrice('');
+    
+    Alert.alert("Success", "পণ্যটি যোগ করা হয়েছে");
+  };
+  
+  // Validate all required fields are filled
+  const validateSelection = () => {
+    if (!selectedCategory) {
+      Alert.alert("Error", "পণ্য ক্যাটাগরি সিলেক্ট করুন");
+      return false;
+    }
+    
+    if (!selectedCompany) {
+      Alert.alert("Error", "কোম্পানি সিলেক্ট করুন");
+      return false;
+    }
+    
+    if (!selectedProductType) {
+      Alert.alert("Error", "প্রোডাক্ট টাইপ সিলেক্ট করুন");
+      return false;
+    }
+    
+    if (selectedProductType.colors && selectedProductType.colors.length > 0 && !selectedColor) {
+      Alert.alert("Error", "কালার সিলেক্ট করুন");
+      return false;
+    }
+    
+    if (selectedProductType.thicknesses && selectedProductType.thicknesses.length > 0 && !selectedThickness) {
+      Alert.alert("Error", "পুরুত্ব সিলেক্ট করুন");
+      return false;
+    }
+    
+    const sizeArray = generateSizeRange(selectedCategory.id);
+    if (sizeArray.length > 0 && !selectedSize) {
+      Alert.alert("Error", "সাইজ সিলেক্ট করুন");
+      return false;
+    }
+    
+    if (!buyPrice) {
+      Alert.alert("Error", "ক্রয়মূল্য প্রবেশ করুন");
+      return false;
+    }
+    
+    if (!sellPrice) {
+      Alert.alert("Error", "বিক্রয়মূল্য প্রবেশ করুন");
+      return false;
+    }
+    
+    if (parseFloat(sellPrice) < parseFloat(buyPrice)) {
+      Alert.alert("Warning", "বিক্রয়মূল্য ক্রয়মূল্য থেকে কম!");
+      // Allow to continue despite warning
+    }
+    
+    return true;
+  };
+  
+  // Add all selected products to cart
+  const handleAddAllToCart = () => {
+    if (selectedProducts.length === 0) {
+      Alert.alert("Error", "কার্টে পণ্য যোগ করার আগে কমপক্ষে একটি পণ্য সিলেক্ট করুন");
       return;
     }
     
-    // Add items to cart
-    // selections.forEach(sel => {
-    //   if (sel.category) {
-    //     const cartItem = {
-    //       id: sel.id,
-    //       category: sel.category.name,
-    //       company: sel.company?.name,
-    //       productType: sel.productType?.name || '',
-    //       color: sel.color || undefined,
-    //       size: sel.size || undefined,
-    //       thickness: sel.thickness || undefined,
-    //       quantity: sel.quantity,
-    //       purchasePrice: sel.purchasePrice,
-    //       sellingPrice: sel.sellingPrice,
-    //       profit: (sel.sellingPrice - sel.purchasePrice) * sel.quantity
-    //     };
-        
-    //     addItem(cartItem);
-    //   }
-    // });
+    selectedProducts.forEach(product => {
+      addItem({
+        category: product.category,
+        company: product.company,
+        product: product.product,
+        color: product.color,
+        size: product.size,
+        thickness: product.thickness,
+        quantity: product.quantity,
+        purchasePrice: product.purchasePrice,
+        sellingPrice: product.sellingPrice,
+        profit: product.profit
+      });
+    });
     
-    Alert.alert(
-      'সফল',
-      'সফলভাবে কার্টে যোগ হয়েছে',
-      [{ text: 'ঠিক আছে', onPress: () => navigation.navigate('Cart' as never) }]
-    );
+    // Navigate to cart screen
+    // @ts-ignore
+    navigation.navigate('CartScreen');
   };
   
-  const renderDropdownModal = (
-    type: DropdownType, 
-    selectionId: string, 
-    selection: Selection
-  ) => {
-    // Get the data for the dropdown based on type and current selection
-    const getDropdownData = () => {
-      switch (type) {
-        case 'category':
-          return PRODUCT_CATEGORIES.map(cat => ({
-            id: cat.id,
-            name: cat.name,
-          }));
-        case 'company':
-          return selection.category?.companies?.map(company => ({
-            id: company.id,
-            name: company.name,
-          })) || [];
-        case 'productType':
-          return selection.company?.productTypes.map(pt => ({
-            id: pt.id,
-            name: pt.name,
-          })) || [];
-        case 'color':
-          if (selection.productType?.colors) {
-            return selection.productType.colors.map((color, index) => ({
-              id: `color-${index}`,
-              name: color,
-            }));
-          }
-          return [];
-        case 'size':
-          // Get sizes from the generateSizeRange function based on category
-          if (selection.category) {
-            const sizes = ['6', '7', '8', '9', '10', '11', '12'];
-            return sizes.map((size, index) => ({
-              id: `size-${index}`,
-              name: size,
-            }));
-          }
-          return [];
-        case 'thickness':
-          // Get thicknesses from the product type if available
-          if (selection.productType?.thicknesses) {
-            return selection.productType.thicknesses.map((thickness, index) => ({
-              id: `thickness-${index}`,
-              name: thickness,
-            }));
-          }
-          return [];
-        default:
-          return [];
-      }
-    };
-    
-    const data = getDropdownData();
-    
-    const handleSelect = (item: { id: string; name: string }) => {
-      switch (type) {
-        case 'category':
-          const category = PRODUCT_CATEGORIES.find(cat => cat.id === item.id) || null;
-          updateSelection(selectionId, 'category', category);
-          break;
-        case 'company':
-          if (selection.category?.companies) {
-            const company = selection.category.companies.find(comp => comp.id === item.id) || null;
-            updateSelection(selectionId, 'company', company);
-          }
-          break;
-        case 'productType':
-          if (selection.company) {
-            const productType = selection.company.productTypes.find(pt => pt.id === item.id) || null;
-            updateSelection(selectionId, 'productType', productType);
-          }
-          break;
-        case 'color':
-          updateSelection(selectionId, 'color', item.name);
-          break;
-        case 'size':
-          updateSelection(selectionId, 'size', item.name);
-          break;
-        case 'thickness':
-          updateSelection(selectionId, 'thickness', item.name);
-          break;
-        default:
-          break;
-      }
-      setActiveDropdown(null);
-    };
-    
-    return (
-      <Modal
-        visible={activeDropdown === type}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setActiveDropdown(null)}
-      >
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1}
-          onPress={() => setActiveDropdown(null)}
-        >
-          <View 
-            style={styles.modalContent}
-            onStartShouldSetResponder={() => true}
-          >
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {type === 'category' ? 'ক্যাটেগরি নির্বাচন' : 
-                 type === 'company' ? 'কোম্পানি নির্বাচন' :
-                 type === 'productType' ? 'প্রোডাক্ট টাইপ নির্বাচন' :
-                 type === 'color' ? 'কালার নির্বাচন' :
-                 type === 'size' ? 'সাইজ নির্বাচন' : 'পুরুত্ব নির্বাচন'}
-              </Text>
-              <TouchableOpacity onPress={() => setActiveDropdown(null)}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-            
-            {data.length > 0 ? (
-              <FlatList
-                data={data}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.modalItem}
-                    onPress={() => handleSelect(item)}
-                  >
-                    <Text style={styles.modalItemText}>{item.name}</Text>
-                  </TouchableOpacity>
-                )}
-              />
-            ) : (
-              <View style={styles.emptyList}>
-                <Text style={styles.emptyListText}>কোন তথ্য নেই</Text>
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
-      </Modal>
-    );
+  // Remove a product from selection
+  const handleRemoveProduct = (id: string) => {
+    setSelectedProducts(selectedProducts.filter(p => p.id !== id));
   };
   
-  const renderProductSelection = (selection: Selection) => {
-    return (
-      <View key={selection.id} style={styles.selectionCard}>
-        {/* Selection Header */}
-        <View style={styles.selectionHeader}>
-          <Text style={styles.selectionTitle}>পণ্য নির্বাচন</Text>
-          {selections.length > 1 && (
-            <TouchableOpacity 
-              style={styles.removeButton}
-              onPress={() => removeSelection(selection.id)}
-            >
-              <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-            </TouchableOpacity>
-          )}
-        </View>
-        
-        {/* Category Selection */}
-        <View style={styles.fieldRow}>
-          <Text style={styles.fieldLabel}>ক্যাটেগরি</Text>
-          <TouchableOpacity 
-            style={styles.dropdown}
-            onPress={() => setActiveDropdown('category')}
-          >
-            <Text style={selection.category ? styles.dropdownText : styles.placeholderText}>
-              {selection.category ? selection.category.name : 'ক্যাটেগরি নির্বাচন করুন'}
-            </Text>
-            <Ionicons name="chevron-down" size={20} color="#777" />
-          </TouchableOpacity>
-          
-          {renderDropdownModal('category', selection.id, selection)}
-        </View>
-        
-        {/* Company Selection - Only if the category has companies */}
-        {selection.category?.companies && (
-          <View style={styles.fieldRow}>
-            <Text style={styles.fieldLabel}>কোম্পানি</Text>
-            <TouchableOpacity 
-              style={[styles.dropdown, !selection.category && styles.disabledDropdown]}
-              onPress={() => selection.category && setActiveDropdown('company')}
-              disabled={!selection.category}
-            >
-              <Text style={selection.company ? styles.dropdownText : styles.placeholderText}>
-                {selection.company ? selection.company.name : 'কোম্পানি নির্বাচন করুন'}
-              </Text>
-              <Ionicons name="chevron-down" size={20} color={selection.category ? "#777" : "#ccc"} />
-            </TouchableOpacity>
-            
-            {renderDropdownModal('company', selection.id, selection)}
-          </View>
-        )}
-        
-        {/* Product Type Selection - Only if company is selected */}
-        {selection.company && (
-          <View style={styles.fieldRow}>
-            <Text style={styles.fieldLabel}>প্রোডাক্ট টাইপ</Text>
-            <TouchableOpacity 
-              style={[styles.dropdown, !selection.company && styles.disabledDropdown]}
-              onPress={() => selection.company && setActiveDropdown('productType')}
-              disabled={!selection.company}
-            >
-              <Text style={selection.productType ? styles.dropdownText : styles.placeholderText}>
-                {selection.productType ? selection.productType.name : 'প্রোডাক্ট টাইপ নির্বাচন করুন'}
-              </Text>
-              <Ionicons name="chevron-down" size={20} color={selection.company ? "#777" : "#ccc"} />
-            </TouchableOpacity>
-            
-            {renderDropdownModal('productType', selection.id, selection)}
-          </View>
-        )}
-        
-        {/* Color Selection - Only if product type has colors */}
-        {selection.productType?.colors && (
-          <View style={styles.fieldRow}>
-            <Text style={styles.fieldLabel}>কালার</Text>
-            <TouchableOpacity 
-              style={styles.dropdown}
-              onPress={() => setActiveDropdown('color')}
-            >
-              <Text style={selection.color ? styles.dropdownText : styles.placeholderText}>
-                {selection.color || 'কালার নির্বাচন করুন'}
-              </Text>
-              <Ionicons name="chevron-down" size={20} color="#777" />
-            </TouchableOpacity>
-            
-            {renderDropdownModal('color', selection.id, selection)}
-          </View>
-        )}
-        
-        {/* Size Selection */}
-        <View style={styles.fieldRow}>
-          <Text style={styles.fieldLabel}>সাইজ</Text>
-          <TouchableOpacity 
-            style={styles.dropdown}
-            onPress={() => setActiveDropdown('size')}
-          >
-            <Text style={selection.size ? styles.dropdownText : styles.placeholderText}>
-              {selection.size || 'সাইজ নির্বাচন করুন'}
-            </Text>
-            <Ionicons name="chevron-down" size={20} color="#777" />
-          </TouchableOpacity>
-          
-          {renderDropdownModal('size', selection.id, selection)}
-        </View>
-        
-        {/* Thickness Selection - Only if product type has thicknesses */}
-        {selection.productType?.thicknesses && (
-          <View style={styles.fieldRow}>
-            <Text style={styles.fieldLabel}>পুরুত্ব</Text>
-            <TouchableOpacity 
-              style={styles.dropdown}
-              onPress={() => setActiveDropdown('thickness')}
-            >
-              <Text style={selection.thickness ? styles.dropdownText : styles.placeholderText}>
-                {selection.thickness || 'পুরুত্ব নির্বাচন করুন'}
-              </Text>
-              <Ionicons name="chevron-down" size={20} color="#777" />
-            </TouchableOpacity>
-            
-            {renderDropdownModal('thickness', selection.id, selection)}
-          </View>
-        )}
-        
-        {/* Quantity, Purchase Price, and Selling Price */}
-        <View style={styles.fieldRow}>
-          <Text style={styles.fieldLabel}>পরিমাণ</Text>
-          <View style={styles.quantityContainer}>
-            <TouchableOpacity 
-              style={styles.quantityButton}
-              onPress={() => decreaseQuantity(selection.id)}
-            >
-              <Ionicons name="remove" size={20} color="#333" />
-            </TouchableOpacity>
-            
-            <Text style={styles.quantityText}>{selection.quantity}</Text>
-            
-            <TouchableOpacity 
-              style={styles.quantityButton}
-              onPress={() => increaseQuantity(selection.id)}
-            >
-              <Ionicons name="add" size={20} color="#333" />
-            </TouchableOpacity>
-          </View>
-        </View>
-        
-        <View style={styles.fieldRow}>
-          <Text style={styles.fieldLabel}>ক্রয় মূল্য</Text>
-          <TextInput
-            style={styles.priceInput}
-            placeholder="ক্রয় মূল্য"
-            keyboardType="numeric"
-            value={selection.purchasePrice > 0 ? selection.purchasePrice.toString() : ''}
-            onChangeText={(value) => updatePrice(selection.id, 'purchasePrice', value)}
-          />
-        </View>
-        
-        <View style={styles.fieldRow}>
-          <Text style={styles.fieldLabel}>বিক্রয় মূল্য</Text>
-          <TextInput
-            style={styles.priceInput}
-            placeholder="বিক্রয় মূল্য"
-            keyboardType="numeric"
-            value={selection.sellingPrice > 0 ? selection.sellingPrice.toString() : ''}
-            onChangeText={(value) => updatePrice(selection.id, 'sellingPrice', value)}
-          />
-        </View>
-        
-        {/* Profit Calculation */}
-        <View style={styles.profitContainer}>
-          <Text style={styles.profitLabel}>লাভ:</Text>
-          <Text style={styles.profitValue}>
-            ৳{((selection.sellingPrice - selection.purchasePrice) * selection.quantity).toFixed(2)}
-          </Text>
-        </View>
-      </View>
-    );
+  // Increase quantity
+  const increaseQuantity = () => {
+    setQuantity(quantity + 1);
   };
-
+  
+  // Decrease quantity
+  const decreaseQuantity = () => {
+    if (quantity > 1) {
+      setQuantity(quantity - 1);
+    }
+  };
+  
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>পণ্য নির্বাচন</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Cart' as never)}>
-          <Ionicons name="cart-outline" size={24} color="#333" />
-        </TouchableOpacity>
-      </View>
-      
-      <ScrollView style={styles.content}>
-        {selections.map(selection => renderProductSelection(selection))}
+      <ScrollView style={styles.formContainer}>
+        {/* Category Selection */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionTitle}>পণ্যের ক্যাটাগরি নির্বাচন করুন:</Text>
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={selectedCategory?.id || ''}
+              onValueChange={(itemValue) => {
+                const category = PRODUCT_CATEGORIES.find(c => c.id === itemValue);
+                setSelectedCategory(category || null);
+              }}
+              style={styles.picker}
+            >
+              <Picker.Item label="-- ক্যাটাগরি সিলেক্ট করুন --" value="" />
+              {PRODUCT_CATEGORIES.map((category) => (
+                <Picker.Item 
+                  key={category.id} 
+                  label={category.name} 
+                  value={category.id} 
+                />
+              ))}
+            </Picker>
+          </View>
+        </View>
         
-        {/* Add New Product Button */}
-        <TouchableOpacity style={styles.addNewButton} onPress={addNewSelection}>
-          <Ionicons name="add-circle-outline" size={20} color="#007AFF" />
-          <Text style={styles.addNewText}>আরও পণ্য যোগ করুন</Text>
+        {/* Company Selection - Show only if category is selected */}
+        {selectedCategory && (
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>কোম্পানি নির্বাচন করুন:</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={selectedCompany?.id || ''}
+                onValueChange={(itemValue) => {
+                  const company = selectedCategory.companies?.find(c => c.id === itemValue);
+                  setSelectedCompany(company || null);
+                }}
+                style={styles.picker}
+              >
+                <Picker.Item label="-- কোম্পানি সিলেক্ট করুন --" value="" />
+                {selectedCategory.companies?.map((company) => (
+                  <Picker.Item 
+                    key={company.id} 
+                    label={company.name} 
+                    value={company.id} 
+                  />
+                ))}
+              </Picker>
+            </View>
+          </View>
+        )}
+        
+        {/* Product Type Selection - Show only if company is selected */}
+        {selectedCompany && (
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>প্রোডাক্ট টাইপ নির্বাচন করুন:</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={selectedProductType?.id || ''}
+                onValueChange={(itemValue) => {
+                  const productType = selectedCompany.productTypes.find(p => p.id === itemValue);
+                  setSelectedProductType(productType || null);
+                }}
+                style={styles.picker}
+              >
+                <Picker.Item label="-- প্রোডাক্ট টাইপ সিলেক্ট করুন --" value="" />
+                {selectedCompany.productTypes.map((product) => (
+                  <Picker.Item 
+                    key={product.id} 
+                    label={product.name} 
+                    value={product.id} 
+                  />
+                ))}
+              </Picker>
+            </View>
+          </View>
+        )}
+        
+        {/* Color Selection - Show only if product type has colors */}
+        {selectedProductType?.colors && selectedProductType.colors.length > 0 && (
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>কালার নির্বাচন করুন:</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={selectedColor || ''}
+                onValueChange={(itemValue) => setSelectedColor(itemValue)}
+                style={styles.picker}
+              >
+                <Picker.Item label="-- কালার সিলেক্ট করুন --" value="" />
+                {selectedProductType.colors.map((color) => (
+                  <Picker.Item 
+                    key={color} 
+                    label={color} 
+                    value={color} 
+                  />
+                ))}
+              </Picker>
+            </View>
+          </View>
+        )}
+        
+        {/* Thickness Selection - Show only if product type has thicknesses */}
+        {selectedProductType?.thicknesses && selectedProductType.thicknesses.length > 0 && (
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>পুরুত্ব নির্বাচন করুন (মিলিমিটার):</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={selectedThickness || ''}
+                onValueChange={(itemValue) => setSelectedThickness(itemValue)}
+                style={styles.picker}
+              >
+                <Picker.Item label="-- পুরুত্ব সিলেক্ট করুন --" value="" />
+                {selectedProductType.thicknesses.map((thickness) => (
+                  <Picker.Item 
+                    key={thickness} 
+                    label={thickness} 
+                    value={thickness} 
+                  />
+                ))}
+              </Picker>
+            </View>
+          </View>
+        )}
+        
+        {/* Size Selection - Show only for categories with sizes */}
+        {selectedCategory && generateSizeRange(selectedCategory.id).length > 0 && (
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>সাইজ নির্বাচন করুন (ফুট):</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={selectedSize || ''}
+                onValueChange={(itemValue) => setSelectedSize(itemValue)}
+                style={styles.picker}
+              >
+                <Picker.Item label="-- সাইজ সিলেক্ট করুন --" value="" />
+                {generateSizeRange(selectedCategory.id).map((size) => (
+                  <Picker.Item 
+                    key={size} 
+                    label={size} 
+                    value={size} 
+                  />
+                ))}
+              </Picker>
+            </View>
+          </View>
+        )}
+        
+        {/* Quantity Selection */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionTitle}>পরিমাণ:</Text>
+          <View style={styles.quantityContainer}>
+            <TouchableOpacity 
+              style={styles.quantityButton} 
+              onPress={decreaseQuantity}
+            >
+              <Ionicons name="remove" size={24} color="#344955" />
+            </TouchableOpacity>
+            <Text style={styles.quantityText}>{quantity}</Text>
+            <TouchableOpacity 
+              style={styles.quantityButton} 
+              onPress={increaseQuantity}
+            >
+              <Ionicons name="add" size={24} color="#344955" />
+            </TouchableOpacity>
+          </View>
+        </View>
+        
+        {/* Price Inputs */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.priceContainer}>
+            <View style={styles.priceInputContainer}>
+              <Text style={styles.priceLabel}>ক্রয় মূল্য (৳):</Text>
+              <TextInput 
+                style={styles.priceInput} 
+                keyboardType="numeric"
+                value={buyPrice}
+                onChangeText={setBuyPrice}
+              />
+            </View>
+            <View style={styles.priceInputContainer}>
+              <Text style={styles.priceLabel}>বিক্রয় মূল্য (৳):</Text>
+              <TextInput 
+                style={styles.priceInput} 
+                keyboardType="numeric"
+                value={sellPrice}
+                onChangeText={setSellPrice}
+              />
+            </View>
+          </View>
+          
+          <View style={styles.profitContainer}>
+            <Text style={styles.profitLabel}>লাভ:</Text>
+            <Text style={styles.profitAmount}>৳{calculateProfit().toFixed(2)}</Text>
+          </View>
+        </View>
+        
+        {/* Add to Selection Button */}
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={handleAddToSelection}
+        >
+          <Ionicons name="add-circle-outline" size={20} color="#FFF" />
+          <Text style={styles.addButtonText}>পণ্য যোগ করুন</Text>
         </TouchableOpacity>
         
-        {/* Add to Cart Button */}
-        <TouchableOpacity style={styles.addToCartButton} onPress={addToCart}>
-          <MaterialIcons name="add-shopping-cart" size={24} color="#fff" />
-          <Text style={styles.addToCartText}>কার্টে যোগ করুন</Text>
-        </TouchableOpacity>
+        {/* Selected Products List */}
+        {selectedProducts.length > 0 && (
+          <View style={styles.selectedProductsContainer}>
+            <Text style={styles.selectedProductsTitle}>নির্বাচিত পণ্যসমূহ:</Text>
+            
+            <FlatList
+              data={selectedProducts}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <View style={styles.selectedProductItem}>
+                  <View style={styles.productDetails}>
+                    <Text style={styles.productCategory}>{item.category}</Text>
+                    <Text style={styles.productInfo}>
+                      {item.company} {item.product}
+                      {item.color ? ` - ${item.color}` : ''}
+                      {item.thickness ? ` - ${item.thickness}mm` : ''}
+                      {item.size ? ` - ${item.size}ft` : ''}
+                    </Text>
+                    <View style={styles.productPriceRow}>
+                      <Text style={styles.productQuantity}>
+                        পরিমাণ: {item.quantity}
+                      </Text>
+                      <Text style={styles.productPrice}>
+                        মূল্য: ৳{item.sellingPrice} × {item.quantity} = ৳{(item.sellingPrice * item.quantity).toFixed(2)}
+                      </Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => handleRemoveProduct(item.id)}
+                  >
+                    <Ionicons name="trash-outline" size={20} color="#F44336" />
+                  </TouchableOpacity>
+                </View>
+              )}
+              style={styles.productList}
+            />
+            
+            {/* Total Amount */}
+            <View style={styles.totalContainer}>
+              <Text style={styles.totalLabel}>মোট:</Text>
+              <Text style={styles.totalAmount}>
+                ৳{selectedProducts.reduce((sum, item) => sum + (item.sellingPrice * item.quantity), 0).toFixed(2)}
+              </Text>
+            </View>
+            
+            {/* Add All to Cart Button */}
+            <TouchableOpacity
+              style={styles.cartButton}
+              onPress={handleAddAllToCart}
+            >
+              <Ionicons name="cart-outline" size={20} color="#FFF" />
+              <Text style={styles.cartButtonText}>কার্টে যোগ করুন</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -589,154 +467,69 @@ export default function ProductSelectionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F5F7FA',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  content: {
-    flex: 1,
+  formContainer: {
     padding: 16,
   },
-  selectionCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+  sectionContainer: {
+    marginBottom: 20,
   },
-  selectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  selectionTitle: {
+  sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    marginBottom: 8,
+    color: '#344955',
   },
-  removeButton: {
-    padding: 8,
-  },
-  fieldRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  fieldLabel: {
-    fontSize: 14,
-    color: '#555',
-    width: '30%',
-  },
-  dropdown: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  pickerContainer: {
+    backgroundColor: 'white',
+    borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 10,
-    width: '68%',
+    borderColor: '#ccc',
+    overflow: 'hidden',
   },
-  disabledDropdown: {
-    backgroundColor: '#f5f5f5',
-    borderColor: '#eee',
-  },
-  dropdownText: {
-    color: '#333',
-    flex: 1,
-  },
-  placeholderText: {
-    color: '#aaa',
-    flex: 1,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    maxHeight: '70%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  modalItem: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  modalItemText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  emptyList: {
-    padding: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyListText: {
-    fontSize: 16,
-    color: '#888',
+  picker: {
+    height: 50,
   },
   quantityContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    width: '68%',
+    borderColor: '#ccc',
+    height: 50,
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
   },
   quantityButton: {
-    padding: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 40,
+    padding: 5,
   },
   quantityText: {
-    fontSize: 16,
-    flex: 1,
-    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#344955',
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  priceInputContainer: {
+    width: '48%',
+  },
+  priceLabel: {
+    fontSize: 14,
+    marginBottom: 4,
+    color: '#4A6572',
   },
   priceInput: {
+    backgroundColor: 'white',
+    borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 10,
-    width: '68%',
+    borderColor: '#ccc',
+    height: 50,
+    paddingHorizontal: 10,
+    fontSize: 16,
   },
   profitContainer: {
     flexDirection: 'row',
@@ -745,45 +538,123 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   profitLabel: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#555',
     marginRight: 8,
+    color: '#344955',
   },
-  profitValue: {
+  profitAmount: {
     fontSize: 18,
-    color: '#4CAF50',
     fontWeight: 'bold',
+    color: '#4CAF50',
   },
-  addNewButton: {
+  addButton: {
+    backgroundColor: '#344955',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 14,
+    borderRadius: 4,
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  addButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    marginLeft: 5,
+  },
+  selectedProductsContainer: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.22,
+    shadowRadius: 2.22,
+    elevation: 3,
+  },
+  selectedProductsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#344955',
+  },
+  productList: {
+    maxHeight: 300,
+  },
+  selectedProductItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 12,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#007AFF',
-    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  addNewText: {
+  productDetails: {
+    flex: 1,
+  },
+  productCategory: {
     fontSize: 16,
-    color: '#007AFF',
-    marginLeft: 8,
+    fontWeight: 'bold',
+    color: '#344955',
   },
-  addToCartButton: {
+  productInfo: {
+    fontSize: 14,
+    color: '#4A6572',
+    marginVertical: 4,
+  },
+  productPriceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  productQuantity: {
+    fontSize: 14,
+    color: '#4A6572',
+  },
+  productPrice: {
+    fontSize: 14,
+    color: '#4A6572',
+  },
+  removeButton: {
+    padding: 8,
+  },
+  totalContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  totalLabel: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#344955',
+  },
+  totalAmount: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#344955',
+  },
+  cartButton: {
+    backgroundColor: '#4CAF50',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
-    marginBottom: 32,
+    borderRadius: 4,
+    marginTop: 16,
   },
-  addToCartText: {
-    fontSize: 16,
+  cartButtonText: {
+    color: 'white',
     fontWeight: 'bold',
-    color: '#fff',
-    marginLeft: 8,
+    fontSize: 16,
+    marginLeft: 5,
   },
 });
