@@ -1,5 +1,7 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
+import { CartItem, CartState, Product, Customer, Transaction } from '../types';
 
 // Define cart item type
 export type CartItem = {
@@ -17,32 +19,42 @@ export type CartItem = {
 };
 
 // Define cart context type
-type CartContextType = {
+interface CartContextType {
   items: CartItem[];
-  addItem: (item: Omit<CartItem, 'id'>) => void;
-  removeItem: (id: string) => void;
+  total: number;
+  subtotal: number;
+  discount: number;
+  addToCart: (product: Product, quantity: number) => void;
+  removeFromCart: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
-  totalAmount: number;
-  totalProfit: number;
-  discount: number;
-  setDiscount: React.Dispatch<React.SetStateAction<number>>;
-  netAmount: number;
-};
+  setDiscount: (amount: number) => void;
+  customer: Customer | null;
+  setCustomer: (customer: Customer | null) => void;
+  checkout: (paid: number) => Promise<Transaction | null>;
+  transactions: Transaction[];
+  loading: boolean;
+}
 
 // Create context with default values
-const CartContext = createContext<CartContextType>({
+const defaultCartContext: CartContextType = {
   items: [],
-  addItem: () => {},
-  removeItem: () => {},
+  total: 0,
+  subtotal: 0,
+  discount: 0,
+  addToCart: () => {},
+  removeFromCart: () => {},
   updateQuantity: () => {},
   clearCart: () => {},
-  totalAmount: 0,
-  totalProfit: 0,
-  discount: 0,
   setDiscount: () => {},
-  netAmount: 0,
-});
+  customer: null,
+  setCustomer: () => {},
+  checkout: async () => null,
+  transactions: [],
+  loading: false,
+};
+
+const CartContext = createContext<CartContextType>(defaultCartContext);
 
 // Custom hook to use the cart context
 export const useCart = () => {
@@ -55,92 +67,250 @@ export const useCart = () => {
 
 // Cart provider component
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [items, setItems] = useState<CartItem[]>([]);
-  const [discount, setDiscount] = useState<number>(0);
-  
-  // Calculate total amount and profit
-  const totalAmount = items.reduce((sum, item) => sum + (item.sellingPrice * item.quantity), 0);
-  const totalProfit = items.reduce((sum, item) => sum + item.profit, 0);
-  const netAmount = totalAmount - discount;
-  
-  // Load cart from AsyncStorage on component mount
+  const [cartState, setCartState] = useState<CartState>({
+    items: [],
+    total: 0,
+    discount: 0,
+  });
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(false);
+  const isMounted = useRef(true);
+
+  // Load saved cart from AsyncStorage on mount
   useEffect(() => {
-    const loadCartFromStorage = async () => {
+    const loadCart = async () => {
       try {
-        const savedCart = await AsyncStorage.getItem('cart');
-        if (savedCart) {
-          setItems(JSON.parse(savedCart));
+        setLoading(true);
+        const savedCartString = await AsyncStorage.getItem('@cart');
+        if (savedCartString) {
+          const savedCart = JSON.parse(savedCartString);
+          if (isMounted.current) {
+            setCartState(savedCart);
+          }
+        }
+
+        // Load saved transactions
+        const savedTransactionsString = await AsyncStorage.getItem('@transactions');
+        if (savedTransactionsString) {
+          const savedTransactions = JSON.parse(savedTransactionsString);
+          if (isMounted.current) {
+            setTransactions(savedTransactions);
+          }
         }
       } catch (error) {
         console.error('Error loading cart from storage:', error);
+        Alert.alert('Error', 'Failed to load cart data');
+      } finally {
+        if (isMounted.current) {
+          setLoading(false);
+        }
       }
     };
-    
-    loadCartFromStorage();
+
+    loadCart();
+
+    return () => {
+      isMounted.current = false;
+    };
   }, []);
-  
+
   // Save cart to AsyncStorage whenever it changes
   useEffect(() => {
     const saveCart = async () => {
       try {
-        // Save to local storage
-        await AsyncStorage.setItem('cart', JSON.stringify(items));
+        await AsyncStorage.setItem('@cart', JSON.stringify(cartState));
       } catch (error) {
-        console.error('Error saving cart:', error);
+        console.error('Error saving cart to storage:', error);
       }
     };
-    
-    // Only save if there are items or if we've loaded the component
-    if (items.length > 0) {
-      saveCart();
-    }
-  }, [items]);
-  
-  // Add item to cart
-  const addItem = (item: Omit<CartItem, 'id'>) => {
-    const newItem = {
-      ...item,
-      id: Date.now().toString() // Simple ID generation
-    };
-    
-    setItems(prevItems => [...prevItems, newItem]);
+
+    saveCart();
+  }, [cartState]);
+
+  // Calculate subtotal and total when cart items or discount changes
+  const subtotal = cartState.items.reduce(
+    (sum, item) => sum + item.product.sellingPrice * item.quantity,
+    0
+  );
+  const total = Math.max(0, subtotal - cartState.discount);
+
+  // Add a product to cart
+  const addToCart = (product: Product, quantity: number) => {
+    setCartState((prevState) => {
+      const existingItemIndex = prevState.items.findIndex(
+        (item) => item.product.id === product.id
+      );
+
+      let updatedItems: CartItem[];
+
+      if (existingItemIndex >= 0) {
+        // If item already exists in cart, update its quantity
+        updatedItems = [...prevState.items];
+        const existingItem = updatedItems[existingItemIndex];
+        updatedItems[existingItemIndex] = {
+          ...existingItem,
+          quantity: existingItem.quantity + quantity,
+        };
+      } else {
+        // If item doesn't exist in cart, add it
+        const newItem: CartItem = {
+          id: product.id,
+          product,
+          quantity,
+        };
+        updatedItems = [...prevState.items, newItem];
+      }
+
+      return {
+        ...prevState,
+        items: updatedItems,
+      };
+    });
   };
-  
-  // Remove item from cart
-  const removeItem = (id: string) => {
-    setItems(prevItems => prevItems.filter(item => item.id !== id));
+
+  // Remove an item from cart
+  const removeFromCart = (id: string) => {
+    setCartState((prevState) => ({
+      ...prevState,
+      items: prevState.items.filter((item) => item.id !== id),
+    }));
   };
-  
-  // Update item quantity
+
+  // Update an item's quantity
   const updateQuantity = (id: string, quantity: number) => {
-    setItems(prevItems => 
-      prevItems.map(item => 
+    if (quantity <= 0) {
+      removeFromCart(id);
+      return;
+    }
+
+    setCartState((prevState) => ({
+      ...prevState,
+      items: prevState.items.map((item) =>
         item.id === id ? { ...item, quantity } : item
-      )
-    );
+      ),
+    }));
   };
-  
-  // Clear cart
+
+  // Clear the cart
   const clearCart = () => {
-    setItems([]);
-    setDiscount(0);
-    
-    // Also clear from storage
-    AsyncStorage.removeItem('cart');
+    setCartState({
+      items: [],
+      total: 0,
+      discount: 0,
+    });
+    setCustomer(null);
   };
-  
+
+  // Set discount amount
+  const setDiscount = (amount: number) => {
+    setCartState((prevState) => ({
+      ...prevState,
+      discount: amount >= 0 ? amount : 0,
+    }));
+  };
+
+  // Process checkout
+  const checkout = async (paid: number): Promise<Transaction | null> => {
+    try {
+      if (cartState.items.length === 0) {
+        Alert.alert('Error', 'Cart is empty');
+        return null;
+      }
+
+      setLoading(true);
+
+      // Create a new transaction
+      const newTransaction: Transaction = {
+        id: Date.now().toString(),
+        date: new Date().toISOString(),
+        customer: customer,
+        items: [...cartState.items],
+        subtotal,
+        discount: cartState.discount,
+        total,
+        paid,
+        due: total - paid,
+      };
+
+      // Update stock levels (in a real app, this would also update the backend)
+      for (const item of cartState.items) {
+        try {
+          // Get current products
+          const productsString = await AsyncStorage.getItem('@products');
+          if (productsString) {
+            const products: Product[] = JSON.parse(productsString);
+            
+            // Update stock for the purchased product
+            const updatedProducts = products.map((product) => {
+              if (product.id === item.product.id) {
+                return {
+                  ...product,
+                  stock: Math.max(0, product.stock - item.quantity),
+                };
+              }
+              return product;
+            });
+            
+            // Save updated products
+            await AsyncStorage.setItem('@products', JSON.stringify(updatedProducts));
+            
+            // Flag offline sync needed
+            await AsyncStorage.setItem('@offline_pending_sync', 'true');
+          }
+        } catch (error) {
+          console.error('Error updating stock:', error);
+        }
+      }
+
+      // Save transaction
+      const updatedTransactions = [...transactions, newTransaction];
+      setTransactions(updatedTransactions);
+      await AsyncStorage.setItem('@transactions', JSON.stringify(updatedTransactions));
+
+      // Clear cart after successful checkout
+      clearCart();
+
+      // Simulate online sync (would be real in production app)
+      try {
+        // Store transaction in offline queue if needed
+        await AsyncStorage.setItem('@offline_pending_sync', 'true');
+        
+        // This would be a real API call in production
+        // await api.recordTransaction(newTransaction);
+      } catch (err) {
+        // Store transaction locally if online fails
+        console.log('Transaction stored offline, will sync later');
+      }
+
+      return newTransaction;
+    } catch (error) {
+      console.error('Checkout error:', error);
+      Alert.alert('Checkout Error', 'Failed to process checkout.');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const value = {
-    items,
-    addItem,
-    removeItem,
+    items: cartState.items,
+    total,
+    subtotal,
+    discount: cartState.discount,
+    addToCart,
+    removeFromCart,
     updateQuantity,
     clearCart,
-    totalAmount,
-    totalProfit,
-    discount,
     setDiscount,
-    netAmount,
+    customer,
+    setCustomer,
+    checkout,
+    transactions,
+    loading,
   };
-  
+
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 };
+
+export default CartContext;
