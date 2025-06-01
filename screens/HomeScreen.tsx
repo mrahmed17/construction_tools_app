@@ -5,6 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { ProductType } from '../types';
+import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -14,9 +16,40 @@ export default function HomeScreen() {
   const [totalStockValue, setTotalStockValue] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Request notification permissions on mount
+  useEffect(() => {
+    async function registerForPushNotifications() {
+      if (Constants.isDevice) {
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
+        if (existingStatus !== 'granted') {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+        }
+        if (finalStatus !== 'granted') {
+          console.log('Notification permissions not granted');
+        }
+      }
+    }
+    registerForPushNotifications();
+  }, []);
+
   useEffect(() => {
     loadStats();
   }, []);
+
+  // Send local notification when low stock items detected
+  useEffect(() => {
+    if (lowStockCount > 0) {
+      Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'লো স্টক এলার্ট',
+          body: `${lowStockCount} টি পণ্য লো স্টকে আছে`
+        },
+        trigger: null
+      });
+    }
+  }, [lowStockCount]);
 
   const loadStats = async () => {
     try {

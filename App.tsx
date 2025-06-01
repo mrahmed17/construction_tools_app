@@ -15,6 +15,7 @@ import ProductManagementScreen from "./screens/ProductManagementScreen";
 import { Ionicons } from '@expo/vector-icons';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
+import { ProductProvider } from './context/ProductContext';
 
 // Stack navigator for auth flow
 const AuthStack = createNativeStackNavigator();
@@ -58,14 +59,6 @@ function AppDrawerNavigator() {
         options={{
           drawerIcon: ({ color }) => <Ionicons name="cart-outline" size={22} color={color} />,
           title: 'নতুন বিক্রয়'
-        }}
-      />
-      <Drawer.Screen
-        name="CategoryGroup"
-        component={ProductManagementScreen}
-        options={{
-          drawerIcon: ({ color }) => <Ionicons name="layers-outline" size={22} color={color} />,
-          title: 'পণ্য বিভাগ'
         }}
       />
       <Drawer.Screen
@@ -131,12 +124,14 @@ export default function App() {
   return (
     <SafeAreaProvider style={styles.container}>
       <AuthProvider>
-        <CartProvider>
-          <Toaster />
-          <NavigationContainer>
-            <AppNavigator />
-          </NavigationContainer>
-        </CartProvider>
+        <ProductProvider>
+          <CartProvider>
+            <Toaster />
+            <NavigationContainer>
+              <AppNavigator />
+            </NavigationContainer>
+          </CartProvider>
+        </ProductProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );
