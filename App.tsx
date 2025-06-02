@@ -102,6 +102,19 @@ function AppDrawerNavigator() {
 const Stack = createNativeStackNavigator();
 
 function AppNavigator() {
+  // We're bypassing authentication for now
+  // DEVELOPMENT MODE: Skip authentication check
+  const SKIP_AUTH = true; // Set to false when you want to enable authentication
+  
+  if (SKIP_AUTH) {
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="AppFlow" component={AppDrawerNavigator} />
+      </Stack.Navigator>
+    );
+  }
+  
+  // Normal authentication flow
   const { user, isLoading } = useAuth();
   
   if (isLoading) {

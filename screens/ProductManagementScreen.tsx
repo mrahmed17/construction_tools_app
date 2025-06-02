@@ -52,22 +52,47 @@ const ProductManagementScreen = () => {
       // Load categories
       const storedCategories = await AsyncStorage.getItem('productCategories');
       if (storedCategories) {
-        setCategories(JSON.parse(storedCategories));
+        const parsedCategories = JSON.parse(storedCategories);
+        // Make sure parsedCategories is an array
+        if (Array.isArray(parsedCategories)) {
+          setCategories(parsedCategories);
+        } else {
+          console.warn('Stored categories is not an array, using defaults');
+          // If not an array, reset to defaults
+          setCategories([...DefaultProductCategories]);
+        }
       }
       
       // Load companies
       const storedCompanies = await AsyncStorage.getItem('productCompanies');
       if (storedCompanies) {
-        setCompanies(JSON.parse(storedCompanies));
+        try {
+          const parsedCompanies = JSON.parse(storedCompanies);
+          setCompanies(parsedCompanies);
+        } catch (e) {
+          console.warn('Failed to parse companies, using defaults');
+          setCompanies(JSON.parse(JSON.stringify(DefaultCompanies)));
+        }
       }
       
       // Load product types
       const storedProductTypes = await AsyncStorage.getItem('productTypes');
       if (storedProductTypes) {
-        setProductTypes(JSON.parse(storedProductTypes));
+        try {
+          const parsedProductTypes = JSON.parse(storedProductTypes);
+          setProductTypes(parsedProductTypes);
+        } catch (e) {
+          console.warn('Failed to parse product types, using defaults');
+          setProductTypes(JSON.parse(JSON.stringify(DefaultProductTypes)));
+        }
       }
     } catch (error) {
+      console.error('Error loading stored data:', error);
       Alert.alert('Error', 'Failed to load stored product data');
+      // Reset to defaults if there's an error
+      setCategories([...DefaultProductCategories]);
+      setCompanies(JSON.parse(JSON.stringify(DefaultCompanies)));
+      setProductTypes(JSON.parse(JSON.stringify(DefaultProductTypes)));
     }
   };
   
@@ -348,7 +373,7 @@ const ProductManagementScreen = () => {
         </TouchableOpacity>
         
         <View style={styles.categoryList}>
-          {categories.map((category, index) => (
+          {Array.isArray(categories) ? categories.map((category, index) => (
             <TouchableOpacity 
               key={index} 
               style={[
@@ -365,7 +390,9 @@ const ProductManagementScreen = () => {
                 <Ionicons name="trash-outline" size={20} color="#FF3B30" />
               </TouchableOpacity>
             </TouchableOpacity>
-          ))}
+          )) : (
+            <Text style={styles.errorText}>No categories available</Text>
+          )}
         </View>
       </View>
       
@@ -380,7 +407,7 @@ const ProductManagementScreen = () => {
           </TouchableOpacity>
           
           <View style={styles.categoryList}>
-            {companies[selectedCategory] && companies[selectedCategory].map((company, index) => (
+            {companies[selectedCategory] && Array.isArray(companies[selectedCategory]) ? companies[selectedCategory].map((company, index) => (
               <TouchableOpacity 
                 key={index} 
                 style={[
@@ -397,7 +424,9 @@ const ProductManagementScreen = () => {
                   <Ionicons name="trash-outline" size={20} color="#FF3B30" />
                 </TouchableOpacity>
               </TouchableOpacity>
-            ))}
+            )) : (
+              <Text style={styles.errorText}>No companies available for this category</Text>
+            )}
           </View>
         </View>
       )}
@@ -413,11 +442,13 @@ const ProductManagementScreen = () => {
           </TouchableOpacity>
           
           <View style={styles.categoryList}>
-            {productTypes[selectedCompany] && productTypes[selectedCompany].map((type, index) => (
+            {productTypes[selectedCompany] && Array.isArray(productTypes[selectedCompany]) ? productTypes[selectedCompany].map((type, index) => (
               <View key={index} style={styles.categoryItem}>
                 <Text style={styles.categoryText}>{type}</Text>
               </View>
-            ))}
+            )) : (
+              <Text style={styles.errorText}>No product types available for this company</Text>
+            )}
           </View>
         </View>
       )}
@@ -674,6 +705,12 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     padding: 5,
+  },
+  errorText: {
+    color: '#FF3B30',
+    textAlign: 'center',
+    padding: 10,
+    fontStyle: 'italic',
   },
   modalContainer: {
     flex: 1,

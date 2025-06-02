@@ -3,14 +3,12 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'rea
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAuth } from '../context/AuthContext';
 import { ProductType } from '../types';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
-  const { user } = useAuth();
   const [totalProducts, setTotalProducts] = useState(0);
   const [lowStockCount, setLowStockCount] = useState(0);
   const [totalStockValue, setTotalStockValue] = useState(0);
@@ -87,7 +85,7 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>ঘর তৈরির সরঞ্জাম</Text>
         <Text style={styles.subtitle}>
-          {user ? `স্বাগতম, ${user.displayName || 'ব্যবহারকারী'}` : 'স্বাগতম'}
+          স্বাগতম, ব্যবহারকারী
         </Text>
       </View>
 
@@ -100,82 +98,87 @@ export default function HomeScreen() {
         </View>
         
         <View style={[styles.card, styles.statCard]}>
-          <Ionicons name="alert-circle-outline" size={32} color={lowStockCount > 0 ? "#E57373" : "#4A6572"} />
-          <Text style={[styles.statValue, lowStockCount > 0 ? styles.alertText : {}]}>{lowStockCount}</Text>
+          <Ionicons name="alert-circle-outline" size={32} color="#FF9500" />
+          <Text style={styles.statValue}>{lowStockCount}</Text>
           <Text style={styles.statLabel}>লো স্টক</Text>
         </View>
-
+        
         <View style={[styles.card, styles.statCard]}>
-          <Ionicons name="cash-outline" size={32} color="#4A6572" />
+          <Ionicons name="cash-outline" size={32} color="#4CD964" />
           <Text style={styles.statValue}>৳{totalStockValue.toLocaleString()}</Text>
-          <Text style={styles.statLabel}>মোট স্টক মূল্য</Text>
+          <Text style={styles.statLabel}>মোট মূল্য</Text>
         </View>
       </View>
 
       {/* Quick Actions */}
-      <Text style={styles.sectionTitle}>দ্রুত অ্যাকশন</Text>
-      <View style={styles.quickActionsContainer}>
+      <Text style={styles.sectionTitle}>দ্রুত কার্যক্রম</Text>
+      <View style={styles.actionsContainer}>
         <TouchableOpacity 
           style={[styles.card, styles.actionCard]} 
           onPress={() => navigateTo('ProductSelection')}
         >
-          <Ionicons name="cart-outline" size={28} color="#344955" />
+          <Ionicons name="cart-outline" size={32} color="#ffffff" />
           <Text style={styles.actionText}>নতুন বিক্রয়</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.card, styles.actionCard]} 
-          onPress={() => navigateTo('ProductManagement')}
-        >
-          <Ionicons name="list-outline" size={28} color="#344955" />
-          <Text style={styles.actionText}>পণ্য ব্যবস্থাপনা</Text>
-        </TouchableOpacity>
-
+        
         <TouchableOpacity 
           style={[styles.card, styles.actionCard]} 
           onPress={() => navigateTo('StockManagement')}
         >
-          <Ionicons name="refresh-outline" size={28} color="#344955" />
+          <Ionicons name="refresh-outline" size={32} color="#ffffff" />
           <Text style={styles.actionText}>স্টক আপডেট</Text>
         </TouchableOpacity>
-
+        
+        <TouchableOpacity 
+          style={[styles.card, styles.actionCard]} 
+          onPress={() => navigateTo('ProductManagement')}
+        >
+          <Ionicons name="cube-outline" size={32} color="#ffffff" />
+          <Text style={styles.actionText}>প্রোডাক্ট ম্যানেজমেন্ট</Text>
+        </TouchableOpacity>
+        
         <TouchableOpacity 
           style={[styles.card, styles.actionCard]} 
           onPress={() => navigateTo('SupplierScreen')}
         >
-          <Ionicons name="people-outline" size={28} color="#344955" />
+          <Ionicons name="people-outline" size={32} color="#ffffff" />
           <Text style={styles.actionText}>সাপ্লাইয়ার</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Low Stock Alerts */}
-      {lowStockCount > 0 && (
-        <>
-          <Text style={styles.sectionTitle}>লো স্টক অ্যালার্ট</Text>
-          <TouchableOpacity 
-            style={[styles.card, styles.alertCard]}
-            onPress={() => navigateTo('StockManagement')}
-          >
-            <View style={styles.alertHeader}>
-              <Ionicons name="warning-outline" size={24} color="#E57373" />
-              <Text style={styles.alertTitle}>
-                {lowStockCount} টি পণ্য লো স্টকে রয়েছে
-              </Text>
-            </View>
-            <Text style={styles.alertMessage}>
-              স্টক আপডেট করতে এখানে ক্লিক করুন
-            </Text>
-          </TouchableOpacity>
-        </>
-      )}
-
-      {/* Help Card */}
-      <View style={[styles.card, styles.helpCard]}>
-        <Text style={styles.helpTitle}>সাহায্য প্রয়োজন?</Text>
-        <Text style={styles.helpText}>
-          এপ্লিকেশন ব্যবহারের জন্য মেনু থেকে প্রয়োজনীয় অপশন নির্বাচন করুন। 
-          স্টক আপডেট, পণ্য যোগ, বা বিক্রয় সম্পাদন করতে উপরের আইকনগুলি ব্যবহার করুন।
-        </Text>
+      {/* Recent Transactions */}
+      <Text style={styles.sectionTitle}>সাম্প্রতিক লেনদেন</Text>
+      <View style={styles.card}>
+        <View style={styles.transactionItem}>
+          <Ionicons name="arrow-up-circle" size={24} color="#FF3B30" />
+          <View style={styles.transactionDetails}>
+            <Text style={styles.transactionTitle}>স্টক আউট</Text>
+            <Text style={styles.transactionSubtitle}>টিন - 10 পিস</Text>
+          </View>
+          <Text style={styles.transactionAmount}>-৳5000</Text>
+        </View>
+        
+        <View style={styles.divider} />
+        
+        <View style={styles.transactionItem}>
+          <Ionicons name="arrow-down-circle" size={24} color="#4CD964" />
+          <View style={styles.transactionDetails}>
+            <Text style={styles.transactionTitle}>স্টক ইন</Text>
+            <Text style={styles.transactionSubtitle}>টিন - 20 পিস</Text>
+          </View>
+          <Text style={[styles.transactionAmount, styles.incomeAmount]}>+৳10000</Text>
+        </View>
+        
+        <View style={styles.divider} />
+        
+        <View style={styles.transactionItem}>
+          <Ionicons name="arrow-up-circle" size={24} color="#FF3B30" />
+          <View style={styles.transactionDetails}>
+            <Text style={styles.transactionTitle}>স্টক আউট</Text>
+            <Text style={styles.transactionSubtitle}>প্লাস্টিকের টিন - 5 পিস</Text>
+          </View>
+          <Text style={styles.transactionAmount}>-৳2500</Text>
+        </View>
       </View>
     </ScrollView>
   );
@@ -184,119 +187,118 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
+    backgroundColor: '#f5f5f5',
   },
   header: {
-    padding: 20,
     backgroundColor: '#344955',
+    padding: 20,
+    paddingTop: 40,
+    paddingBottom: 30,
+    borderBottomLeftRadius: 15,
+    borderBottomRightRadius: 15,
   },
   title: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 4,
+    color: '#ffffff',
+    marginBottom: 5,
   },
   subtitle: {
     fontSize: 16,
-    color: '#E0E0E0',
+    color: '#F9AA33',
   },
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 12,
+    marginTop: -30,
+    paddingHorizontal: 15,
   },
   card: {
-    backgroundColor: 'white',
+    backgroundColor: '#ffffff',
     borderRadius: 8,
-    padding: 16,
+    padding: 15,
+    marginBottom: 15,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
     elevation: 2,
   },
   statCard: {
     flex: 1,
-    margin: 4,
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingVertical: 20,
+    marginHorizontal: 5,
   },
   statValue: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginVertical: 8,
+    marginTop: 10,
+    marginBottom: 5,
     color: '#344955',
   },
   statLabel: {
     fontSize: 14,
     color: '#4A6572',
   },
-  alertText: {
-    color: '#E57373',
-  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginHorizontal: 16,
-    marginTop: 20,
-    marginBottom: 12,
+    marginTop: 15,
+    marginBottom: 10,
+    paddingHorizontal: 15,
     color: '#344955',
   },
-  quickActionsContainer: {
+  actionsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 8,
+    justifyContent: 'space-between',
+    paddingHorizontal: 15,
   },
   actionCard: {
-    width: '46%',
-    marginHorizontal: '2%',
-    marginVertical: 8,
+    width: '48%',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 100,
+    backgroundColor: '#4A6572',
+    marginBottom: 10,
   },
   actionText: {
     fontSize: 16,
-    fontWeight: '500',
-    marginTop: 8,
-    color: '#344955',
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginLeft: 10,
+    flex: 1,
   },
-  alertCard: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#E57373',
-  },
-  alertHeader: {
+  transactionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    paddingVertical: 10,
   },
-  alertTitle: {
+  transactionDetails: {
+    flex: 1,
+    marginLeft: 15,
+  },
+  transactionTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-    color: '#E57373',
+    fontWeight: 'bold',
+    color: '#344955',
   },
-  alertMessage: {
+  transactionSubtitle: {
     fontSize: 14,
-    color: '#666',
-  },
-  helpCard: {
-    margin: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#4DB6AC',
-    marginBottom: 30,
-  },
-  helpTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 8,
     color: '#4A6572',
+    marginTop: 2,
   },
-  helpText: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
+  transactionAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FF3B30',
   },
+  incomeAmount: {
+    color: '#4CD964',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginVertical: 5,
+  }
 });
