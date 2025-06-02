@@ -13,6 +13,7 @@ import SupplierScreen from './screens/SupplierScreen';
 import StockManagementScreen from './screens/StockManagementScreen';
 import ProductSelectionScreen from './screens/ProductSelectionScreen';
 import ProductManagementScreen from './screens/ProductManagementScreen';
+import ReportScreen from './screens/ReportScreen';
 import PriceConfig from './components/PriceConfig';
 
 const Stack = createStackNavigator();
@@ -75,6 +76,13 @@ function DrawerNavigator() {
         component={ProductManagementScreen} 
         options={{
           title: 'পণ্য ব্যবস্থাপনা',
+        }}
+      />
+      <Drawer.Screen 
+        name="Report" 
+        component={ReportScreen} 
+        options={{
+          title: 'রিপোর্ট',
         }}
       />
       <Drawer.Screen 

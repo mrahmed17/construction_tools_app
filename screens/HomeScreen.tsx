@@ -32,6 +32,106 @@ const HomeScreen = () => {
   // Recent transactions
   const [recentTransactions, setRecentTransactions] = useState([]);
 
+  // Add sample sales data for report demo
+  useEffect(() => {
+    const addSampleSalesData = async () => {
+      try {
+        // Check if we already have sales data
+        const existingSales = await AsyncStorage.getItem('sales');
+        if (!existingSales) {
+          const pastWeekSales = [];
+          const today = new Date();
+          
+          // Create 30 days of random sales data
+          for (let i = 0; i < 30; i++) {
+            const saleDate = new Date(today);
+            saleDate.setDate(today.getDate() - i);
+            
+            // Generate 1-3 sales for each day
+            const dailySalesCount = Math.floor(Math.random() * 3) + 1;
+            
+            for (let j = 0; j < dailySalesCount; j++) {
+              const itemCount = Math.floor(Math.random() * 5) + 1;
+              const items = [];
+              
+              // Generate random items
+              for (let k = 0; k < itemCount; k++) {
+                const purchasePrice = Math.floor(Math.random() * 1000) + 500;
+                const sellingPrice = purchasePrice + Math.floor(Math.random() * 300);
+                items.push({
+                  id: `item-${Date.now()}-${k}`,
+                  category: ['টিন', 'টুয়া', 'প্লেইন শিট', 'ফুলের শিট'][Math.floor(Math.random() * 4)],
+                  company: ['php', 'KY', 'TK (G)', 'ABUL Khair'][Math.floor(Math.random() * 4)],
+                  product: ['সুপার', 'লুম', 'কালার'][Math.floor(Math.random() * 3)],
+                  quantity: Math.floor(Math.random() * 10) + 1,
+                  purchasePrice,
+                  sellingPrice,
+                  profit: sellingPrice - purchasePrice
+                });
+              }
+              
+              // Calculate totals
+              const totalAmount = items.reduce((sum, item) => sum + (item.sellingPrice * item.quantity), 0);
+              const totalProfit = items.reduce((sum, item) => sum + (item.profit * item.quantity), 0);
+              
+              // Create sale record
+              const sale = {
+                id: `sale-${Date.now()}-${i}-${j}`,
+                date: saleDate.toISOString(),
+                customerName: ['আলি হোসেন', 'করিম মিয়া', 'আব্দুল রহমান', 'মঞ্জুর আলম', 'রফিকুল ইসলাম'][Math.floor(Math.random() * 5)],
+                items,
+                totalAmount,
+                totalProfit,
+                discount: Math.random() > 0.7 ? Math.floor(Math.random() * 500) : 0
+              };
+              
+              pastWeekSales.push(sale);
+            }
+          }
+          
+          // Save to AsyncStorage
+          await AsyncStorage.setItem('sales', JSON.stringify(pastWeekSales));
+          
+          // Also update recent transactions
+          setRecentTransactions(pastWeekSales.slice(0, 5).map(sale => ({
+            id: sale.id,
+            date: sale.date,
+            customerName: sale.customerName,
+            total: sale.totalAmount,
+            items: sale.items.length
+          })));
+          
+          // Update today's sales in stats
+          const todaySales = pastWeekSales.filter(sale => {
+            const saleDate = new Date(sale.date);
+            return saleDate.getDate() === today.getDate() && 
+                   saleDate.getMonth() === today.getMonth() && 
+                   saleDate.getFullYear() === today.getFullYear();
+          });
+          
+          const todayTotal = todaySales.reduce((sum, sale) => sum + sale.totalAmount, 0);
+          
+          setStats(prev => ({
+            ...prev,
+            recentSales: todayTotal
+          }));
+          
+          await AsyncStorage.setItem('recentTransactions', JSON.stringify(pastWeekSales.slice(0, 5).map(sale => ({
+            id: sale.id,
+            date: sale.date,
+            customerName: sale.customerName,
+            total: sale.totalAmount,
+            items: sale.items.length
+          }))));
+        }
+      } catch (error) {
+        console.error('Error adding sample sales data:', error);
+      }
+    };
+    
+    addSampleSalesData();
+  }, []);
+
   // Check low stock alert
   useEffect(() => {
     if (products && products.length > 0) {
@@ -52,12 +152,12 @@ const HomeScreen = () => {
       }
       
       // Update stats
-      setStats({
+      setStats(prev => ({
+        ...prev,
         totalProducts: products.length,
         lowStockCount: lowStockProducts.length,
         totalCategories: Array.isArray(categories) ? categories.length : 0,
-        recentSales: 0, // Will be loaded later
-      });
+      }));
     }
   }, [products, categories]);
 
@@ -68,27 +168,6 @@ const HomeScreen = () => {
         const savedTransactions = await AsyncStorage.getItem('recentTransactions');
         if (savedTransactions) {
           setRecentTransactions(JSON.parse(savedTransactions).slice(0, 5)); // Show only latest 5
-        } else {
-          // Demo transactions
-          const demoTransactions = [
-            { 
-              id: '1',
-              date: new Date().toISOString(),
-              customerName: 'আলি হোসেন',
-              total: 15000,
-              items: 3
-            },
-            {
-              id: '2',
-              date: new Date(Date.now() - 86400000).toISOString(), // Yesterday
-              customerName: 'করিম মিয়া',
-              total: 8500,
-              items: 2
-            }
-          ];
-          
-          setRecentTransactions(demoTransactions);
-          await AsyncStorage.setItem('recentTransactions', JSON.stringify(demoTransactions));
         }
       } catch (error) {
         console.error('Error loading transactions:', error);
@@ -230,6 +309,16 @@ const HomeScreen = () => {
               <MaterialIcons name="price-change" size={24} color="#0097a7" />
             </View>
             <Text style={styles.actionText}>মূল্য তালিকা</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('Report' as never)}
+          >
+            <View style={[styles.actionIconContainer, { backgroundColor: '#fff8e1' }]}>
+              <MaterialIcons name="bar-chart" size={24} color="#ffa000" />
+            </View>
+            <Text style={styles.actionText}>রিপোর্ট</Text>
           </TouchableOpacity>
         </View>
       </View>
