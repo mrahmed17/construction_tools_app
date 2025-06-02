@@ -1,627 +1,551 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
   TextInput,
   Alert,
   Modal,
   Image,
+  ActivityIndicator,
   Platform
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
-import { 
-  DefaultProductCategories, 
-  DefaultCompanies, 
-  ProductCategory, 
-  DefaultProductTypes,
-  ProductImage
-} from '../types';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useProducts, Category, Company, ProductType, Product } from '../context/ProductContext';
 
 const ProductManagementScreen = () => {
   const navigation = useNavigation();
-  const [categories, setCategories] = useState<string[]>([...DefaultProductCategories]);
-  const [companies, setCompanies] = useState<{[key: string]: string[]}>(JSON.parse(JSON.stringify(DefaultCompanies)));
-  const [productTypes, setProductTypes] = useState<{[key: string]: string[]}>(JSON.parse(JSON.stringify(DefaultProductTypes)));
+  const { categories, products, addCategory, addCompany, addProductType, addProduct, saveProductImage, loading } = useProducts();
+
+  const [modalVisible, setModalVisible] = useState(false);
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [addingCompany, setAddingCompany] = useState(false);
+  const [addingProductType, setAddingProductType] = useState(false);
+  const [addingProduct, setAddingProduct] = useState(false);
   
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [selectedCompany, setSelectedCompany] = useState<string>('');
-  const [newCategory, setNewCategory] = useState<string>('');
-  const [newCompany, setNewCompany] = useState<string>('');
-  const [newProductType, setNewProductType] = useState<string>('');
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [showCompanyModal, setShowCompanyModal] = useState(false);
-  const [showProductTypeModal, setShowProductTypeModal] = useState(false);
-  const [showImageModal, setShowImageModal] = useState(false);
+  const [newCompanyName, setNewCompanyName] = useState('');
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   
-  const [productImage, setProductImage] = useState<ProductImage | null>(null);
-  
-  // Load stored categories, companies and product types on mount
+  const [newProductTypeName, setNewProductTypeName] = useState('');
+  const [newProductTypeHasColors, setNewProductTypeHasColors] = useState(false);
+  const [selectedProductType, setSelectedProductType] = useState<ProductType | null>(null);
+
+  // Product fields
+  const [productName, setProductName] = useState('');
+  const [productCategory, setProductCategory] = useState('');
+  const [productCompany, setProductCompany] = useState('');
+  const [productType, setProductType] = useState('');
+  const [productColor, setProductColor] = useState('');
+  const [productThickness, setProductThickness] = useState('');
+  const [productSize, setProductSize] = useState('');
+  const [productPurchasePrice, setProductPurchasePrice] = useState('');
+  const [productSalePrice, setProductSalePrice] = useState('');
+  const [productStock, setProductStock] = useState('');
+  const [productImage, setProductImage] = useState('');
+  const [productLowStockThreshold, setProductLowStockThreshold] = useState('5');
+
+  // Request camera and photo library permissions on component mount
   useEffect(() => {
-    loadStoredData();
-  }, []);
-  
-  const loadStoredData = async () => {
-    try {
-      // Load categories
-      const storedCategories = await AsyncStorage.getItem('productCategories');
-      if (storedCategories) {
-        const parsedCategories = JSON.parse(storedCategories);
-        // Make sure parsedCategories is an array
-        if (Array.isArray(parsedCategories)) {
-          setCategories(parsedCategories);
-        } else {
-          console.warn('Stored categories is not an array, using defaults');
-          // If not an array, reset to defaults
-          setCategories([...DefaultProductCategories]);
-        }
-      }
-      
-      // Load companies
-      const storedCompanies = await AsyncStorage.getItem('productCompanies');
-      if (storedCompanies) {
-        try {
-          const parsedCompanies = JSON.parse(storedCompanies);
-          setCompanies(parsedCompanies);
-        } catch (e) {
-          console.warn('Failed to parse companies, using defaults');
-          setCompanies(JSON.parse(JSON.stringify(DefaultCompanies)));
-        }
-      }
-      
-      // Load product types
-      const storedProductTypes = await AsyncStorage.getItem('productTypes');
-      if (storedProductTypes) {
-        try {
-          const parsedProductTypes = JSON.parse(storedProductTypes);
-          setProductTypes(parsedProductTypes);
-        } catch (e) {
-          console.warn('Failed to parse product types, using defaults');
-          setProductTypes(JSON.parse(JSON.stringify(DefaultProductTypes)));
-        }
-      }
-    } catch (error) {
-      console.error('Error loading stored data:', error);
-      Alert.alert('Error', 'Failed to load stored product data');
-      // Reset to defaults if there's an error
-      setCategories([...DefaultProductCategories]);
-      setCompanies(JSON.parse(JSON.stringify(DefaultCompanies)));
-      setProductTypes(JSON.parse(JSON.stringify(DefaultProductTypes)));
-    }
-  };
-  
-  // Save categories
-  const saveCategories = async (newCategoriesList: string[]) => {
-    try {
-      await AsyncStorage.setItem('productCategories', JSON.stringify(newCategoriesList));
-    } catch (error) {
-      Alert.alert('Error', 'Failed to save categories');
-    }
-  };
-  
-  // Save companies
-  const saveCompanies = async (companiesData: {[key: string]: string[]}) => {
-    try {
-      await AsyncStorage.setItem('productCompanies', JSON.stringify(companiesData));
-    } catch (error) {
-      Alert.alert('Error', 'Failed to save companies');
-    }
-  };
-  
-  // Save product types
-  const saveProductTypes = async (productTypesData: {[key: string]: string[]}) => {
-    try {
-      await AsyncStorage.setItem('productTypes', JSON.stringify(productTypesData));
-    } catch (error) {
-      Alert.alert('Error', 'Failed to save product types');
-    }
-  };
-  
-  // Add new category
-  const handleAddCategory = () => {
-    if (newCategory.trim() === '') {
-      Alert.alert('Error', 'Category name cannot be empty');
-      return;
-    }
-    
-    if (categories.includes(newCategory)) {
-      Alert.alert('Error', 'This category already exists');
-      return;
-    }
-    
-    const updatedCategories = [...categories, newCategory];
-    setCategories(updatedCategories);
-    
-    // Add empty company array for this category
-    const updatedCompanies = {...companies};
-    updatedCompanies[newCategory] = [];
-    setCompanies(updatedCompanies);
-    
-    // Save to storage
-    saveCategories(updatedCategories);
-    saveCompanies(updatedCompanies);
-    
-    setNewCategory('');
-    setShowCategoryModal(false);
-    
-    Alert.alert('Success', `Category "${newCategory}" has been added`);
-  };
-  
-  // Add new company to selected category
-  const handleAddCompany = () => {
-    if (!selectedCategory) {
-      Alert.alert('Error', 'Please select a category first');
-      return;
-    }
-    
-    if (newCompany.trim() === '') {
-      Alert.alert('Error', 'Company name cannot be empty');
-      return;
-    }
-    
-    if (companies[selectedCategory].includes(newCompany)) {
-      Alert.alert('Error', 'This company already exists in the selected category');
-      return;
-    }
-    
-    // Update companies
-    const updatedCompanies = {...companies};
-    updatedCompanies[selectedCategory] = [...updatedCompanies[selectedCategory], newCompany];
-    setCompanies(updatedCompanies);
-    
-    // Initialize product types for this company
-    const updatedProductTypes = {...productTypes};
-    updatedProductTypes[newCompany] = [];
-    setProductTypes(updatedProductTypes);
-    
-    // Save to storage
-    saveCompanies(updatedCompanies);
-    saveProductTypes(updatedProductTypes);
-    
-    setNewCompany('');
-    setShowCompanyModal(false);
-    
-    Alert.alert('Success', `Company "${newCompany}" has been added to "${selectedCategory}"`);
-  };
-  
-  // Add new product type to selected company
-  const handleAddProductType = () => {
-    if (!selectedCompany) {
-      Alert.alert('Error', 'Please select a company first');
-      return;
-    }
-    
-    if (newProductType.trim() === '') {
-      Alert.alert('Error', 'Product type cannot be empty');
-      return;
-    }
-    
-    if (productTypes[selectedCompany] && productTypes[selectedCompany].includes(newProductType)) {
-      Alert.alert('Error', 'This product type already exists for the selected company');
-      return;
-    }
-    
-    // Update product types
-    const updatedProductTypes = {...productTypes};
-    
-    // Initialize if not exists
-    if (!updatedProductTypes[selectedCompany]) {
-      updatedProductTypes[selectedCompany] = [];
-    }
-    
-    updatedProductTypes[selectedCompany] = [...updatedProductTypes[selectedCompany], newProductType];
-    setProductTypes(updatedProductTypes);
-    
-    // Save to storage
-    saveProductTypes(updatedProductTypes);
-    
-    setNewProductType('');
-    setShowProductTypeModal(false);
-    
-    Alert.alert('Success', `Product type "${newProductType}" has been added to company "${selectedCompany}"`);
-  };
-  
-  // Delete category
-  const handleDeleteCategory = (category: string) => {
-    Alert.alert(
-      'Confirm Delete',
-      `Are you sure you want to delete the category "${category}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: () => {
-            // Filter out the category
-            const updatedCategories = categories.filter(cat => cat !== category);
-            setCategories(updatedCategories);
-            
-            // Remove companies for this category
-            const updatedCompanies = {...companies};
-            delete updatedCompanies[category];
-            setCompanies(updatedCompanies);
-            
-            // Save to storage
-            saveCategories(updatedCategories);
-            saveCompanies(updatedCompanies);
-            
-            Alert.alert('Success', `Category "${category}" has been deleted`);
-          }
-        }
-      ]
-    );
-  };
-  
-  // Delete company
-  const handleDeleteCompany = (category: string, company: string) => {
-    Alert.alert(
-      'Confirm Delete',
-      `Are you sure you want to delete the company "${company}" from category "${category}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: () => {
-            // Filter out the company
-            const updatedCompanies = {...companies};
-            updatedCompanies[category] = updatedCompanies[category].filter(comp => comp !== company);
-            setCompanies(updatedCompanies);
-            
-            // Save to storage
-            saveCompanies(updatedCompanies);
-            
-            Alert.alert('Success', `Company "${company}" has been deleted`);
-          }
-        }
-      ]
-    );
-  };
-  
-  // Pick an image from camera or gallery
-  const pickImage = async (useCamera: boolean) => {
-    try {
-      // Request permissions first
+    (async () => {
       if (Platform.OS !== 'web') {
-        const { status } = useCamera 
-          ? await ImagePicker.requestCameraPermissionsAsync()
-          : await ImagePicker.requestMediaLibraryPermissionsAsync();
-          
-        if (status !== 'granted') {
-          Alert.alert('Permission needed', 'Please grant camera permissions to use this feature.');
-          return;
+        const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
+        if (cameraStatus !== 'granted') {
+          Alert.alert('অনুমতি প্রয়োজন', 'ক্যামেরা ব্যবহারের অনুমতি দিন।');
+        }
+
+        const { status: libraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (libraryStatus !== 'granted') {
+          Alert.alert('অনুমতি প্রয়োজন', 'গ্যালারি ব্যবহারের অনুমতি দিন।');
         }
       }
-      
-      // Launch camera or image picker
-      const result = useCamera 
-        ? await ImagePicker.launchCameraAsync({
-            allowsEditing: true,
-            aspect: [4, 3],
-            quality: 0.7,
-            base64: true,
-          })
-        : await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [4, 3],
-            quality: 0.7,
-            base64: true,
-          });
-          
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const imageUri = result.assets[0].uri;
-        const base64 = result.assets[0].base64;
-        
-        setProductImage({ 
-          uri: imageUri,
-          base64: base64
-        });
-        
-        // Save image to AsyncStorage (in a real app, we'd save to device storage or cloud)
-        await saveImageToStorage(imageUri, base64);
+    })();
+  }, []);
+
+  const handleCategoryAdd = () => {
+    if (newCategoryName.trim() === '') {
+      Alert.alert('ত্রুটি', 'ক্যাটাগরির নাম প্রয়োজন।');
+      return;
+    }
+
+    addCategory(newCategoryName);
+    setNewCategoryName('');
+    setAddingCategory(false);
+    Alert.alert('সফল', 'ক্যাটাগরি যোগ করা হয়েছে!');
+  };
+
+  const handleCompanyAdd = () => {
+    if (!selectedCategory) {
+      Alert.alert('ত্রুটি', 'ক্যাটাগরি নির্বাচন করুন।');
+      return;
+    }
+
+    if (newCompanyName.trim() === '') {
+      Alert.alert('ত্রুটি', 'কোম্পানির নাম প্রয়োজন।');
+      return;
+    }
+
+    addCompany(selectedCategory.id, newCompanyName);
+    setNewCompanyName('');
+    setAddingCompany(false);
+    Alert.alert('সফল', 'কোম্পানি যোগ করা হয়েছে!');
+  };
+
+  const handleProductTypeAdd = () => {
+    if (!selectedCategory || !selectedCompany) {
+      Alert.alert('ত্রুটি', 'ক্যাটাগরি এবং কোম্পানি নির্বাচন করুন।');
+      return;
+    }
+
+    if (newProductTypeName.trim() === '') {
+      Alert.alert('ত্রুটি', 'প্রোডাক্ট টাইপের নাম প্রয়োজন।');
+      return;
+    }
+
+    const productTypeData: Partial<ProductType> = {
+      name: newProductTypeName,
+      hasColors: newProductTypeHasColors,
+      colors: newProductTypeHasColors ? ['লাল', 'নীল', 'সবুজ'] : [],
+      thicknessRange: {
+        min: 0.12,
+        max: 0.5,
+        step: 0.01,
+        unit: 'মিমি'
+      },
+      sizeRange: {
+        min: 6,
+        max: 12,
+        unit: 'ফুট'
       }
-    } catch (error) {
-      console.error('Error picking image: ', error);
-      Alert.alert('Error', 'Failed to pick image');
+    };
+
+    addProductType(selectedCategory.id, selectedCompany.id, productTypeData);
+    setNewProductTypeName('');
+    setNewProductTypeHasColors(false);
+    setAddingProductType(false);
+    Alert.alert('সফল', 'প্রোডাক্ট টাইপ যোগ করা হয়েছে!');
+  };
+
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      setProductImage(result.assets[0].uri);
     }
   };
-  
-  // Save image to AsyncStorage
-  const saveImageToStorage = async (uri: string, base64?: string) => {
-    try {
-      if (base64) {
-        const imageKey = `product_image_${Date.now()}`;
-        await AsyncStorage.setItem(imageKey, base64);
-        
-        // Save reference to the image key
-        const imageReferences = await AsyncStorage.getItem('productImageReferences') || '[]';
-        const references = JSON.parse(imageReferences);
-        references.push({ key: imageKey, uri });
-        await AsyncStorage.setItem('productImageReferences', JSON.stringify(references));
-        
-        Alert.alert('Success', 'Image saved successfully');
-      }
-    } catch (error) {
-      console.error('Error saving image: ', error);
-      Alert.alert('Error', 'Failed to save image');
+
+  const takePhoto = async () => {
+    let result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.7,
+    });
+
+    if (!result.canceled) {
+      setProductImage(result.assets[0].uri);
     }
   };
-  
+
+  const handleProductAdd = async () => {
+    if (!selectedCategory || !productThickness || !productSize) {
+      Alert.alert('ত্রুটি', 'সকল প্রয়োজনীয় তথ্য পূরণ করুন।');
+      return;
+    }
+
+    const purchasePrice = parseFloat(productPurchasePrice);
+    const salePrice = parseFloat(productSalePrice);
+    const stock = parseInt(productStock, 10);
+    const lowStockThreshold = parseInt(productLowStockThreshold, 10);
+
+    if (isNaN(purchasePrice) || isNaN(salePrice) || isNaN(stock)) {
+      Alert.alert('ত্রুটি', 'মূল্য এবং স্টক সংখ্যা হতে হবে।');
+      return;
+    }
+
+    const newProduct: Partial<Product> = {
+      category: selectedCategory.name,
+      company: selectedCompany?.name,
+      type: selectedProductType?.name,
+      color: productColor || undefined,
+      thickness: productThickness,
+      size: productSize,
+      purchasePrice,
+      salePrice,
+      stock,
+      lowStockThreshold,
+      photoUri: productImage || undefined
+    };
+
+    // Add the product
+    addProduct(newProduct);
+
+    // Reset form fields
+    setProductCategory('');
+    setProductCompany('');
+    setProductType('');
+    setProductColor('');
+    setProductThickness('');
+    setProductSize('');
+    setProductPurchasePrice('');
+    setProductSalePrice('');
+    setProductStock('');
+    setProductImage('');
+    setProductLowStockThreshold('5');
+    
+    setSelectedCategory(null);
+    setSelectedCompany(null);
+    setSelectedProductType(null);
+    
+    setAddingProduct(false);
+    Alert.alert('সফল', 'পণ্য যোগ করা হয়েছে!');
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+        <Text>লোড হচ্ছে...</Text>
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.title}>প্রোডাক্ট ম্যানেজমেন্ট</Text>
-      </View>
-      
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>প্রোডাক্ট ক্যাটাগরি</Text>
-        <TouchableOpacity 
-          style={styles.addButton} 
-          onPress={() => setShowCategoryModal(true)}
+      <View style={styles.headerContainer}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
         >
-          <Text style={styles.addButtonText}>নতুন ক্যাটাগরি যোগ করুন</Text>
+          <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
-        
-        <View style={styles.categoryList}>
-          {Array.isArray(categories) ? categories.map((category, index) => (
-            <TouchableOpacity 
-              key={index} 
-              style={[
-                styles.categoryItem, 
-                selectedCategory === category && styles.selectedItem
-              ]}
-              onPress={() => setSelectedCategory(category)}
-            >
-              <Text style={styles.categoryText}>{category}</Text>
-              <TouchableOpacity 
-                style={styles.deleteButton}
-                onPress={() => handleDeleteCategory(category)}
-              >
-                <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-              </TouchableOpacity>
-            </TouchableOpacity>
-          )) : (
-            <Text style={styles.errorText}>No categories available</Text>
-          )}
-        </View>
+        <Text style={styles.headerText}>পণ্য ব্যবস্থাপনা</Text>
       </View>
-      
-      {selectedCategory && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{selectedCategory} - কোম্পানি</Text>
-          <TouchableOpacity 
-            style={styles.addButton} 
-            onPress={() => setShowCompanyModal(true)}
-          >
-            <Text style={styles.addButtonText}>নতুন কোম্পানি যোগ করুন</Text>
-          </TouchableOpacity>
-          
-          <View style={styles.categoryList}>
-            {companies[selectedCategory] && Array.isArray(companies[selectedCategory]) ? companies[selectedCategory].map((company, index) => (
-              <TouchableOpacity 
-                key={index} 
-                style={[
-                  styles.categoryItem, 
-                  selectedCompany === company && styles.selectedItem
-                ]}
-                onPress={() => setSelectedCompany(company)}
-              >
-                <Text style={styles.categoryText}>{company}</Text>
-                <TouchableOpacity 
-                  style={styles.deleteButton}
-                  onPress={() => handleDeleteCompany(selectedCategory, company)}
-                >
-                  <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-                </TouchableOpacity>
-              </TouchableOpacity>
-            )) : (
-              <Text style={styles.errorText}>No companies available for this category</Text>
-            )}
-          </View>
-        </View>
-      )}
-      
-      {selectedCompany && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{selectedCompany} - প্রোডাক্ট টাইপ</Text>
-          <TouchableOpacity 
-            style={styles.addButton} 
-            onPress={() => setShowProductTypeModal(true)}
-          >
-            <Text style={styles.addButtonText}>নতুন প্রোডাক্ট টাইপ যোগ করুন</Text>
-          </TouchableOpacity>
-          
-          <View style={styles.categoryList}>
-            {productTypes[selectedCompany] && Array.isArray(productTypes[selectedCompany]) ? productTypes[selectedCompany].map((type, index) => (
-              <View key={index} style={styles.categoryItem}>
-                <Text style={styles.categoryText}>{type}</Text>
-              </View>
-            )) : (
-              <Text style={styles.errorText}>No product types available for this company</Text>
-            )}
-          </View>
-        </View>
-      )}
-      
+
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>প্রোডাক্ট ছবি</Text>
-        <TouchableOpacity 
-          style={styles.addButton} 
-          onPress={() => setShowImageModal(true)}
-        >
-          <Text style={styles.addButtonText}>ছবি যোগ করুন</Text>
-        </TouchableOpacity>
-        
-        {productImage && (
-          <View style={styles.imageContainer}>
-            <Image source={{ uri: productImage.uri }} style={styles.productImage} />
-            <Text style={styles.imageCaption}>প্রোডাক্টের ছবি</Text>
-          </View>
-        )}
-      </View>
-      
-      {/* Add Category Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={showCategoryModal}
-        onRequestClose={() => setShowCategoryModal(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>নতুন ক্যাটাগরি যোগ করুন</Text>
-            
+        <Text style={styles.sectionTitle}>ক্যাটাগরি ব্যবস্থাপনা</Text>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => setAddingCategory(true)}
+          >
+            <Text style={styles.buttonText}>নতুন ক্যাটাগরি যোগ করুন</Text>
+          </TouchableOpacity>
+        </View>
+
+        {addingCategory && (
+          <View style={styles.formContainer}>
             <TextInput
               style={styles.input}
               placeholder="ক্যাটাগরির নাম"
-              value={newCategory}
-              onChangeText={setNewCategory}
+              value={newCategoryName}
+              onChangeText={setNewCategoryName}
             />
-            
-            <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]} 
-                onPress={() => setShowCategoryModal(false)}
-              >
-                <Text style={styles.buttonText}>বাতিল</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.confirmButton]} 
-                onPress={handleAddCategory}
-              >
-                <Text style={styles.buttonText}>যোগ করুন</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-      
-      {/* Add Company Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={showCompanyModal}
-        onRequestClose={() => setShowCompanyModal(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>নতুন কোম্পানি যোগ করুন</Text>
-            
-            <TextInput
-              style={styles.input}
-              placeholder="কোম্পানির নাম"
-              value={newCompany}
-              onChangeText={setNewCompany}
-            />
-            
-            <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]} 
-                onPress={() => setShowCompanyModal(false)}
-              >
-                <Text style={styles.buttonText}>বাতিল</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.confirmButton]} 
-                onPress={handleAddCompany}
-              >
-                <Text style={styles.buttonText}>যোগ করুন</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-      
-      {/* Add Product Type Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={showProductTypeModal}
-        onRequestClose={() => setShowProductTypeModal(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>নতুন প্রোডাক্ট টাইপ যোগ করুন</Text>
-            
-            <TextInput
-              style={styles.input}
-              placeholder="প্রোডাক্ট টাইপের নাম"
-              value={newProductType}
-              onChangeText={setNewProductType}
-            />
-            
-            <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]} 
-                onPress={() => setShowProductTypeModal(false)}
-              >
-                <Text style={styles.buttonText}>বাতিল</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.confirmButton]} 
-                onPress={handleAddProductType}
-              >
-                <Text style={styles.buttonText}>যোগ করুন</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-      
-      {/* Image Picker Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={showImageModal}
-        onRequestClose={() => setShowImageModal(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>প্রোডাক্ট ছবি যোগ করুন</Text>
-            
-            <View style={styles.imagePickerButtons}>
-              <TouchableOpacity 
-                style={styles.imagePickerButton} 
-                onPress={() => {
-                  pickImage(true);
-                  setShowImageModal(false);
-                }}
-              >
-                <Ionicons name="camera" size={30} color="#007AFF" />
-                <Text style={styles.imagePickerText}>ক্যামেরা</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.imagePickerButton} 
-                onPress={() => {
-                  pickImage(false);
-                  setShowImageModal(false);
-                }}
-              >
-                <Ionicons name="images" size={30} color="#007AFF" />
-                <Text style={styles.imagePickerText}>গ্যালারি</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <TouchableOpacity 
-              style={[styles.modalButton, styles.cancelButton, { marginTop: 20 }]} 
-              onPress={() => setShowImageModal(false)}
+            <TouchableOpacity
+              style={styles.submitButton}
+              onPress={handleCategoryAdd}
+            >
+              <Text style={styles.buttonText}>যোগ করুন</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.submitButton, styles.cancelButton]}
+              onPress={() => setAddingCategory(false)}
             >
               <Text style={styles.buttonText}>বাতিল</Text>
             </TouchableOpacity>
+          </View>
+        )}
+
+        <ScrollView horizontal style={styles.categoriesList}>
+          {Array.isArray(categories) && categories.map((category) => (
+            <TouchableOpacity
+              key={category.id}
+              style={[
+                styles.categoryItem,
+                selectedCategory?.id === category.id && styles.selectedItem
+              ]}
+              onPress={() => setSelectedCategory(category)}
+            >
+              <Text style={styles.categoryText}>{category.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {selectedCategory && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>কোম্পানি ব্যবস্থাপনা - {selectedCategory.name}</Text>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setAddingCompany(true)}
+            >
+              <Text style={styles.buttonText}>নতুন কোম্পানি যোগ করুন</Text>
+            </TouchableOpacity>
+          </View>
+
+          {addingCompany && (
+            <View style={styles.formContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="কোম্পানির নাম"
+                value={newCompanyName}
+                onChangeText={setNewCompanyName}
+              />
+              <TouchableOpacity
+                style={styles.submitButton}
+                onPress={handleCompanyAdd}
+              >
+                <Text style={styles.buttonText}>যোগ করুন</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.submitButton, styles.cancelButton]}
+                onPress={() => setAddingCompany(false)}
+              >
+                <Text style={styles.buttonText}>বাতিল</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <ScrollView horizontal style={styles.categoriesList}>
+            {Array.isArray(selectedCategory.companies) && selectedCategory.companies.map((company) => (
+              <TouchableOpacity
+                key={company.id}
+                style={[
+                  styles.categoryItem,
+                  selectedCompany?.id === company.id && styles.selectedItem
+                ]}
+                onPress={() => setSelectedCompany(company)}
+              >
+                <Text style={styles.categoryText}>{company.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {selectedCategory && selectedCompany && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>প্রোডাক্ট টাইপ - {selectedCompany.name}</Text>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setAddingProductType(true)}
+            >
+              <Text style={styles.buttonText}>নতুন প্রোডাক্ট টাইপ যোগ করুন</Text>
+            </TouchableOpacity>
+          </View>
+
+          {addingProductType && (
+            <View style={styles.formContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="প্রোডাক্ট টাইপের নাম"
+                value={newProductTypeName}
+                onChangeText={setNewProductTypeName}
+              />
+              
+              <View style={styles.checkboxContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.checkbox,
+                    newProductTypeHasColors && styles.checkboxSelected
+                  ]}
+                  onPress={() => setNewProductTypeHasColors(!newProductTypeHasColors)}
+                >
+                  {newProductTypeHasColors && <Ionicons name="checkmark" size={16} color="#fff" />}
+                </TouchableOpacity>
+                <Text style={styles.checkboxLabel}>কালার অপশন আছে?</Text>
+              </View>
+              
+              <TouchableOpacity
+                style={styles.submitButton}
+                onPress={handleProductTypeAdd}
+              >
+                <Text style={styles.buttonText}>যোগ করুন</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.submitButton, styles.cancelButton]}
+                onPress={() => setAddingProductType(false)}
+              >
+                <Text style={styles.buttonText}>বাতিল</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <ScrollView horizontal style={styles.categoriesList}>
+            {Array.isArray(selectedCompany.productTypes) && selectedCompany.productTypes.map((type) => (
+              <TouchableOpacity
+                key={type.id}
+                style={[
+                  styles.categoryItem,
+                  selectedProductType?.id === type.id && styles.selectedItem
+                ]}
+                onPress={() => setSelectedProductType(type)}
+              >
+                <Text style={styles.categoryText}>{type.name}</Text>
+                {type.hasColors && <Ionicons name="color-palette" size={16} color="#666" />}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>পণ্য যোগ করুন</Text>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => setModalVisible(true)}
+        >
+          <Text style={styles.buttonText}>নতুন পণ্য যোগ করুন</Text>
+        </TouchableOpacity>
+
+        <View style={styles.productStats}>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{products.length}</Text>
+            <Text style={styles.statLabel}>মোট পণ্য</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>
+              {products.filter(p => p.stock <= (p.lowStockThreshold || 5)).length}
+            </Text>
+            <Text style={styles.statLabel}>কম স্টক</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>
+              {Array.isArray(categories) ? categories.length : 0}
+            </Text>
+            <Text style={styles.statLabel}>ক্যাটাগরি</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Add Product Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>নতুন পণ্য যোগ করুন</Text>
+            
+            <ScrollView style={styles.modalScrollView}>
+              <Text style={styles.formLabel}>পুরুত্ব (মিমি)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="পুরুত্ব (মিমি)"
+                value={productThickness}
+                onChangeText={setProductThickness}
+                keyboardType="numeric"
+              />
+              
+              <Text style={styles.formLabel}>সাইজ (ফুট)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="সাইজ (ফুট)"
+                value={productSize}
+                onChangeText={setProductSize}
+              />
+              
+              <Text style={styles.formLabel}>কালার (যদি থাকে)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="কালার"
+                value={productColor}
+                onChangeText={setProductColor}
+              />
+              
+              <Text style={styles.formLabel}>ক্রয় মূল্য (টাকা)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="ক্রয় মূল্য"
+                value={productPurchasePrice}
+                onChangeText={setProductPurchasePrice}
+                keyboardType="numeric"
+              />
+              
+              <Text style={styles.formLabel}>বিক্রয় মূল্য (টাকা)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="বিক্রয় মূল্য"
+                value={productSalePrice}
+                onChangeText={setProductSalePrice}
+                keyboardType="numeric"
+              />
+              
+              <Text style={styles.formLabel}>স্টক পরিমাণ</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="স্টক"
+                value={productStock}
+                onChangeText={setProductStock}
+                keyboardType="numeric"
+              />
+              
+              <Text style={styles.formLabel}>কম স্টক সীমা</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="কম স্টক সীমা"
+                value={productLowStockThreshold}
+                onChangeText={setProductLowStockThreshold}
+                keyboardType="numeric"
+              />
+              
+              <Text style={styles.formLabel}>পণ্যের ছবি</Text>
+              <View style={styles.imageButtonContainer}>
+                <TouchableOpacity style={styles.imageButton} onPress={takePhoto}>
+                  <Ionicons name="camera" size={24} color="#fff" />
+                  <Text style={styles.imageButtonText}>ক্যামেরা</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity style={styles.imageButton} onPress={pickImage}>
+                  <Ionicons name="image" size={24} color="#fff" />
+                  <Text style={styles.imageButtonText}>গ্যালারি</Text>
+                </TouchableOpacity>
+              </View>
+              
+              {productImage ? (
+                <View style={styles.imagePreviewContainer}>
+                  <Image source={{ uri: productImage }} style={styles.imagePreview} />
+                  <TouchableOpacity
+                    style={styles.removeImageButton}
+                    onPress={() => setProductImage('')}
+                  >
+                    <Ionicons name="close-circle" size={24} color="#ff0000" />
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+              
+              <View style={styles.modalButtonContainer}>
+                <TouchableOpacity
+                  style={styles.modalButton}
+                  onPress={handleProductAdd}
+                >
+                  <Text style={styles.modalButtonText}>যোগ করুন</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelModalButton]}
+                  onPress={() => setModalVisible(false)}
+                >
+                  <Text style={styles.modalButtonText}>বাতিল</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -632,12 +556,19 @@ const ProductManagementScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8f8f8',
   },
-  header: {
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
+  },
+  headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
@@ -645,154 +576,206 @@ const styles = StyleSheet.create({
   backButton: {
     marginRight: 16,
   },
-  title: {
-    fontSize: 20,
+  headerText: {
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
   },
   section: {
     backgroundColor: '#fff',
-    margin: 10,
-    padding: 15,
-    borderRadius: 10,
+    borderRadius: 8,
+    padding: 16,
+    margin: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
+    marginBottom: 12,
+  },
+  buttonContainer: {
+    marginBottom: 12,
   },
   addButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#2196F3',
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 6,
     alignItems: 'center',
-    marginBottom: 15,
-  },
-  addButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  categoryList: {
-    marginTop: 10,
-  },
-  categoryItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  selectedItem: {
-    backgroundColor: '#e3f2fd',
-    borderColor: '#90caf9',
-  },
-  categoryText: {
-    fontSize: 16,
-    color: '#333',
-    flex: 1,
-  },
-  deleteButton: {
-    padding: 5,
-  },
-  errorText: {
-    color: '#FF3B30',
-    textAlign: 'center',
-    padding: 10,
-    fontStyle: 'italic',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    width: '85%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
-    color: '#333',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 15,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  modalButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    margin: 5,
-  },
-  cancelButton: {
-    backgroundColor: '#FF3B30',
-  },
-  confirmButton: {
-    backgroundColor: '#4CD964',
   },
   buttonText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  formContainer: {
+    marginVertical: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 6,
+    padding: 12,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 6,
+    padding: 10,
+    marginVertical: 8,
+    backgroundColor: '#fff',
+  },
+  submitButton: {
+    backgroundColor: '#4CAF50',
+    padding: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  cancelButton: {
+    backgroundColor: '#F44336',
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 2,
+    borderColor: '#666',
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  checkboxSelected: {
+    backgroundColor: '#2196F3',
+    borderColor: '#2196F3',
+  },
+  checkboxLabel: {
     fontSize: 16,
   },
-  imagePickerButtons: {
+  categoriesList: {
+    flexDirection: 'row',
+    marginVertical: 8,
+  },
+  categoryItem: {
+    backgroundColor: '#e0e0e0',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  selectedItem: {
+    backgroundColor: '#2196F3',
+  },
+  categoryText: {
+    fontSize: 14,
+    marginRight: 4,
+  },
+  productStats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginVertical: 20,
+    marginTop: 16,
   },
-  imagePickerButton: {
+  statItem: {
     alignItems: 'center',
-    padding: 15,
   },
-  imagePickerText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#007AFF',
+  statNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#2196F3',
   },
-  imageContainer: {
-    alignItems: 'center',
-    marginTop: 15,
+  statLabel: {
+    fontSize: 14,
+    color: '#666',
   },
-  productImage: {
-    width: 200,
-    height: 200,
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    margin: 20,
     borderRadius: 10,
+    maxHeight: '80%',
+  },
+  modalScrollView: {
+    padding: 20,
+    maxHeight: '90%',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: 20,
     marginBottom: 10,
   },
-  imageCaption: {
+  formLabel: {
     fontSize: 16,
-    color: '#666',
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  imageButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginVertical: 12,
+  },
+  imageButton: {
+    backgroundColor: '#2196F3',
+    padding: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+    width: '45%',
+    flexDirection: 'row',
+    justifyContent: 'center',
+  },
+  imageButtonText: {
+    color: '#fff',
+    marginLeft: 8,
+  },
+  imagePreviewContainer: {
+    alignItems: 'center',
+    marginVertical: 12,
+    position: 'relative',
+  },
+  imagePreview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    resizeMode: 'cover',
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    backgroundColor: '#fff',
+    borderRadius: 15,
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    marginBottom: 30,
+  },
+  modalButton: {
+    backgroundColor: '#4CAF50',
+    padding: 14,
+    borderRadius: 6,
+    alignItems: 'center',
+    width: '48%',
+  },
+  cancelModalButton: {
+    backgroundColor: '#F44336',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 

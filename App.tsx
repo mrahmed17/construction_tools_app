@@ -1,158 +1,145 @@
-import React from 'react';
+import 'react-native-gesture-handler';
+import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { StyleSheet } from 'react-native';
-import { SafeAreaProvider } from "react-native-safe-area-context";
-import { Toaster } from 'sonner-native';
 import { createDrawerNavigator } from '@react-navigation/drawer';
-import HomeScreen from "./screens/HomeScreen";
-import AuthScreen from "./screens/AuthScreen";
-import CartScreen from "./screens/CartScreen";
-import ProductSelectionScreen from "./screens/ProductSelectionScreen";
-import StockManagementScreen from "./screens/StockManagementScreen";
-import SupplierScreen from "./screens/SupplierScreen";
-import ProductManagementScreen from "./screens/ProductManagementScreen";
-import { Ionicons } from '@expo/vector-icons';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { createStackNavigator } from '@react-navigation/stack';
+import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { ProductProvider } from './context/ProductContext';
+import HomeScreen from './screens/HomeScreen';
+import AuthScreen from './screens/AuthScreen';
+import CartScreen from './screens/CartScreen';
+import SupplierScreen from './screens/SupplierScreen';
+import StockManagementScreen from './screens/StockManagementScreen';
+import ProductSelectionScreen from './screens/ProductSelectionScreen';
+import ProductManagementScreen from './screens/ProductManagementScreen';
+import PriceConfig from './components/PriceConfig';
 
-// Stack navigator for auth flow
-const AuthStack = createNativeStackNavigator();
-function AuthNavigator() {
+const Stack = createStackNavigator();
+const Drawer = createDrawerNavigator();
+
+// For development, we'll skip authentication
+const SKIP_AUTH = true;
+
+// Create a custom sidebar drawer component
+function CustomDrawerContent({ navigation }) {
   return (
-    <AuthStack.Navigator screenOptions={{ headerShown: false }}>
-      <AuthStack.Screen name="Auth" component={AuthScreen} />
-    </AuthStack.Navigator>
+    <React.Fragment>
+      {/* Navigation items will be rendered by the DrawerContentScrollView */}
+    </React.Fragment>
   );
 }
 
-// Drawer navigator for main app
-const Drawer = createDrawerNavigator();
-function AppDrawerNavigator() {
+// Main drawer navigation component
+function DrawerNavigator() {
   return (
-    <Drawer.Navigator 
-      initialRouteName="Dashboard"
+    <Drawer.Navigator
+      initialRouteName="Home"
       screenOptions={{
-        headerStyle: {
-          backgroundColor: '#344955',
+        headerShown: false,
+        drawerStyle: {
+          width: 280,
         },
-        headerTintColor: '#fff',
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
-        drawerActiveTintColor: '#344955',
-        drawerInactiveTintColor: '#4A6572',
       }}
     >
-      <Drawer.Screen
-        name="Dashboard"
-        component={HomeScreen}
+      <Drawer.Screen 
+        name="Home" 
+        component={HomeScreen} 
         options={{
-          drawerIcon: ({ color }) => <Ionicons name="home-outline" size={22} color={color} />,
-          title: 'ড্যাশবোর্ড'
+          title: 'ড্যাশবোর্ড',
         }}
       />
-      <Drawer.Screen
-        name="ProductSelection"
-        component={ProductSelectionScreen}
+      <Drawer.Screen 
+        name="ProductSelection" 
+        component={ProductSelectionScreen} 
         options={{
-          drawerIcon: ({ color }) => <Ionicons name="cart-outline" size={22} color={color} />,
-          title: 'নতুন বিক্রয়'
+          title: 'পণ্য নির্বাচন',
         }}
       />
-      <Drawer.Screen
-        name="StockManagement"
-        component={StockManagementScreen}
-        options={{
-          drawerIcon: ({ color }) => <Ionicons name="refresh-outline" size={22} color={color} />,
-          title: 'স্টক ব্যবস্থাপনা'
-        }}
-      />
-      <Drawer.Screen
-        name="SupplierScreen"
-        component={SupplierScreen}
-        options={{
-          drawerIcon: ({ color }) => <Ionicons name="people-outline" size={22} color={color} />,
-          title: 'সাপ্লাইয়ার'
-        }}
-      />
-      <Drawer.Screen
-        name="ProductManagement"
-        component={ProductManagementScreen}
-        options={{
-          drawerIcon: ({ color }) => <Ionicons name="cube-outline" size={22} color={color} />,
-          title: 'পণ্য ব্যবস্থাপনা'
-        }}
-      />
-      <Drawer.Screen
-        name="CartScreen"
+      <Drawer.Screen 
+        name="Cart" 
         component={CartScreen}
         options={{
-          drawerIcon: ({ color }) => <Ionicons name="basket-outline" size={22} color={color} />,
           title: 'কার্ট',
-          drawerItemStyle: { display: 'none' }, // Hide from drawer but keep in navigation
+        }}
+      />
+      <Drawer.Screen 
+        name="StockManagement" 
+        component={StockManagementScreen} 
+        options={{
+          title: 'স্টক ব্যবস্থাপনা',
+        }}
+      />
+      <Drawer.Screen 
+        name="ProductManagement" 
+        component={ProductManagementScreen} 
+        options={{
+          title: 'পণ্য ব্যবস্থাপনা',
+        }}
+      />
+      <Drawer.Screen 
+        name="Supplier" 
+        component={SupplierScreen} 
+        options={{
+          title: 'সাপ্লায়ার',
+        }}
+      />
+      <Drawer.Screen 
+        name="PriceConfig" 
+        component={PriceConfig} 
+        options={{
+          title: 'মূল্য কনফিগারেশন',
         }}
       />
     </Drawer.Navigator>
   );
 }
 
-// Main stack for navigating between auth and app flows
-const Stack = createNativeStackNavigator();
-
-function AppNavigator() {
-  // We're bypassing authentication for now
-  // DEVELOPMENT MODE: Skip authentication check
-  const SKIP_AUTH = true; // Set to false when you want to enable authentication
-  
-  if (SKIP_AUTH) {
-    return (
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="AppFlow" component={AppDrawerNavigator} />
-      </Stack.Navigator>
-    );
-  }
-  
-  // Normal authentication flow
-  const { user, isLoading } = useAuth();
-  
-  if (isLoading) {
-    // You could return a loading screen here
-    return null;
-  }
-  
+function AuthStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {!user ? (
-        <Stack.Screen name="AuthFlow" component={AuthNavigator} />
-      ) : (
-        <Stack.Screen name="AppFlow" component={AppDrawerNavigator} />
-      )}
+      <Stack.Screen name="Auth" component={AuthScreen} />
     </Stack.Navigator>
   );
 }
 
-export default function App() {
+function App() {
+  const [isSignedIn, setIsSignedIn] = useState(false);
+
+  useEffect(() => {
+    // For development, we'll skip authentication check
+    if (SKIP_AUTH) {
+      setIsSignedIn(true);
+      return;
+    }
+
+    // Here you would normally check if the user is authenticated
+    // For example, by checking AsyncStorage for a token
+    const checkAuthStatus = async () => {
+      try {
+        // Check authentication status
+        // For now, we'll just set it to false
+        setIsSignedIn(false);
+      } catch (error) {
+        console.error('Error checking auth status:', error);
+        setIsSignedIn(false);
+      }
+    };
+
+    checkAuthStatus();
+  }, []);
+
   return (
-    <SafeAreaProvider style={styles.container}>
+    <NavigationContainer>
       <AuthProvider>
-        <ProductProvider>
-          <CartProvider>
-            <Toaster />
-            <NavigationContainer>
-              <AppNavigator />
-            </NavigationContainer>
-          </CartProvider>
-        </ProductProvider>
+        <CartProvider>
+          <ProductProvider>
+            {isSignedIn ? <DrawerNavigator /> : <AuthStack />}
+          </ProductProvider>
+        </CartProvider>
       </AuthProvider>
-    </SafeAreaProvider>
+    </NavigationContainer>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    userSelect: "none"
-  }
-});
+export default App;
