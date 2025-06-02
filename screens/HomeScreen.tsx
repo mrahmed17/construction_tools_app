@@ -202,7 +202,7 @@ const HomeScreen = () => {
         <TouchableOpacity onPress={() => navigation.navigate('Cart' as never)}>
           <View style={styles.cartIconContainer}>
             <Ionicons name="cart-outline" size={28} color="#333" />
-            {cartItems.length > 0 && (
+            {cartItems && cartItems.length > 0 && (
               <View style={styles.cartBadge}>
                 <Text style={styles.cartBadgeText}>{cartItems.length}</Text>
               </View>

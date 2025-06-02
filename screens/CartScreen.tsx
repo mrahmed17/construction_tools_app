@@ -37,6 +37,8 @@ export default function CartScreen() {
   
   // Calculate totals
   useEffect(() => {
+    if (!cartItems) return;
+    
     const subTotal = cartItems.reduce(
       (acc, item) => acc + (item.salePrice * (item.quantity || 1)), 0
     );
@@ -55,6 +57,7 @@ export default function CartScreen() {
   }, [cartItems, discountPercent, advanceAmount]);
 
   const handleIncreaseQuantity = (id) => {
+    if (!cartItems) return;
     const item = cartItems.find(item => item.id === id);
     if (item) {
       updateCartItemQuantity(id, (item.quantity || 1) + 1);
@@ -62,6 +65,7 @@ export default function CartScreen() {
   };
 
   const handleDecreaseQuantity = (id) => {
+    if (!cartItems) return;
     const item = cartItems.find(item => item.id === id);
     if (item && item.quantity > 1) {
       updateCartItemQuantity(id, item.quantity - 1);
@@ -80,7 +84,7 @@ export default function CartScreen() {
   };
 
   const handleCheckout = () => {
-    if (cartItems.length === 0) {
+    if (!cartItems || cartItems.length === 0) {
       Alert.alert('ত্রুটি', 'কার্টে কোন পণ্য নেই।');
       return;
     }
@@ -164,7 +168,7 @@ export default function CartScreen() {
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>আপনার কার্ট</Text>
-        {cartItems.length > 0 && (
+        {cartItems && cartItems.length > 0 && (
           <TouchableOpacity
             style={styles.clearButton}
             onPress={() => {
@@ -183,7 +187,7 @@ export default function CartScreen() {
         )}
       </View>
 
-      {cartItems.length === 0 ? (
+      {!cartItems || cartItems.length === 0 ? (
         <View style={styles.emptyCartContainer}>
           <MaterialIcons name="shopping-cart" size={80} color="#e0e0e0" />
           <Text style={styles.emptyCartText}>আপনার কার্ট খালি</Text>
@@ -260,7 +264,7 @@ export default function CartScreen() {
           <View style={styles.summaryContainer}>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>মোট পণ্য</Text>
-              <Text style={styles.summaryValue}>{cartItems.length}</Text>
+              <Text style={styles.summaryValue}>{cartItems ? cartItems.length : 0}</Text>
             </View>
             
             <View style={styles.summaryRow}>
