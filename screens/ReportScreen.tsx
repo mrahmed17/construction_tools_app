@@ -21,43 +21,49 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
 // Chart component (simplified version without actual library dependency)
-const LineChart = ({ data, labels }) => (
-  <View style={styles.chartContainer}>
-    <Text style={styles.chartTitle}>বিক্রয় রিপোর্ট চার্ট</Text>
-    <View style={styles.chartContent}>
-      <View style={styles.yAxis}>
-        {[4, 3, 2, 1, 0].map((value, index) => (
-          <Text key={index} style={styles.yAxisLabel}>
-            {Math.round(Math.max(...data) * value / 4).toLocaleString()}
-          </Text>
+const LineChart = ({ data, labels }) => {
+  // Get the maximum value in the data or use 1 if all values are 0
+  const maxValue = Math.max(...data) || 1;
+  
+  return (
+    <View style={styles.chartContainer}>
+      <Text style={styles.chartTitle}>বিক্রয় রিপোর্ট চার্ট</Text>
+      <View style={styles.chartContent}>
+        <View style={styles.yAxis}>
+          {[4, 3, 2, 1, 0].map((value, index) => (
+            <Text key={index} style={styles.yAxisLabel}>
+              {Math.round(maxValue * value / 4).toLocaleString()}
+            </Text>
+          ))}
+        </View>
+        <View style={styles.chartBars}>
+          {data.map((value, index) => {
+            // Calculate height in pixels (scale from 0 to 150px max)
+            const heightPixels = maxValue > 0 ? (value / maxValue) * 150 : 0;
+            
+            return (
+              <View key={index} style={styles.barWrapper}>
+                <View 
+                  style={[
+                    styles.bar, 
+                    { height: heightPixels },
+                    index % 2 === 0 ? { backgroundColor: '#3498db' } : { backgroundColor: '#2980b9' }
+                  ]} 
+                />
+                <Text style={styles.barValue}>{value > 999 ? `${Math.round(value/1000)}K` : value}</Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+      <View style={styles.xAxis}>
+        {labels.map((label, idx) => (
+          <Text key={idx} style={styles.xAxisLabel}>{label}</Text>
         ))}
       </View>
-      <View style={styles.chartBars}>
-        {data.map((value, index) => {
-          // Calculate height percentage relative to max value
-          const heightPercent = Math.max(...data) > 0 ? (value / Math.max(...data)) * 100 : 0;
-          return (
-            <View key={index} style={styles.barWrapper}>
-              <View 
-                style={[
-                  styles.bar, 
-                  { height: `${heightPercent}%` },
-                  index % 2 === 0 ? { backgroundColor: '#3498db' } : { backgroundColor: '#2980b9' }
-                ]} 
-              />
-              <Text style={styles.barValue}>{value > 999 ? `${Math.round(value/1000)}K` : value}</Text>
-            </View>
-          );
-        })}
-      </View>
     </View>
-    <View style={styles.xAxis}>
-      {labels.map((label, idx) => (
-        <Text key={idx} style={styles.xAxisLabel}>{label}</Text>
-      ))}
-    </View>
-  </View>
-);
+  );
+};
 
 const ReportScreen = () => {
   const navigation = useNavigation();
@@ -272,211 +278,216 @@ const ReportScreen = () => {
     }
   };
   
+  const generateReactNativePdfHtml = () => {
+    // Create formatted prices
+    const formattedTotal = totalSales.toLocaleString();
+    const formattedProfit = totalProfit.toLocaleString();
+    
+    // Create top products HTML
+    let productsHTML = '';
+    if (topProducts.length > 0) {
+      topProducts.forEach((product, index) => {
+        productsHTML += `
+          <tr style="border-bottom: 1px solid #eee;">
+            <td style="padding: 8px;">${index + 1}</td>
+            <td style="padding: 8px;">${product.name}</td>
+            <td style="padding: 8px; text-align: center;">${product.quantity}</td>
+            <td style="padding: 8px; text-align: right;">${product.revenue.toLocaleString()} টাকা</td>
+          </tr>
+        `;
+      });
+    } else {
+      productsHTML = `
+        <tr>
+          <td colspan="4" style="text-align: center; padding: 16px;">কোন পণ্য বিক্রয় নেই</td>
+        </tr>
+      `;
+    }
+    
+    // Create sales list HTML
+    let salesHTML = '';
+    if (salesData.length > 0) {
+      salesData.forEach((sale, index) => {
+        salesHTML += `
+          <tr style="border-bottom: 1px solid #eee;">
+            <td style="padding: 8px;">${index + 1}</td>
+            <td style="padding: 8px;">${new Date(sale.date).toLocaleDateString()}</td>
+            <td style="padding: 8px;">${sale.customerName || 'অজানা'}</td>
+            <td style="padding: 8px; text-align: center;">${sale.items.length}</td>
+            <td style="padding: 8px; text-align: right;">${sale.totalAmount.toLocaleString()} টাকা</td>
+            <td style="padding: 8px; text-align: right;">${sale.totalProfit.toLocaleString()} টাকা</td>
+          </tr>
+        `;
+      });
+    } else {
+      salesHTML = `
+        <tr>
+          <td colspan="6" style="text-align: center; padding: 16px;">কোন বিক্রয় নেই</td>
+        </tr>
+      `;
+    }
+    
+    // Create HTML for the PDF
+    return `
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
+          <style>
+            body {
+              font-family: 'Helvetica', sans-serif;
+              margin: 0;
+              padding: 16px;
+              color: #333;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 24px;
+            }
+            h1 {
+              font-size: 24px;
+              margin-bottom: 8px;
+            }
+            .subtitle {
+              font-size: 16px;
+              color: #666;
+              margin-bottom: 4px;
+            }
+            .summary-container {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 24px;
+              margin-top: 32px;
+            }
+            .summary-card {
+              background-color: #f7f7f7;
+              border-radius: 8px;
+              padding: 16px;
+              text-align: center;
+              width: 30%;
+            }
+            .summary-value {
+              font-size: 18px;
+              font-weight: bold;
+              margin-bottom: 4px;
+            }
+            .summary-label {
+              font-size: 12px;
+              color: #666;
+            }
+            .section {
+              margin-top: 32px;
+            }
+            .section-title {
+              font-size: 18px;
+              margin-bottom: 16px;
+              padding-bottom: 8px;
+              border-bottom: 2px solid #eee;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+            }
+            th {
+              background-color: #f2f2f2;
+              padding: 8px;
+              text-align: left;
+              font-size: 14px;
+            }
+            td {
+              padding: 8px 4px;
+              font-size: 12px;
+            }
+            .footer {
+              margin-top: 40px;
+              text-align: center;
+              font-size: 12px;
+              color: #999;
+              padding-top: 16px;
+              border-top: 1px solid #eee;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>বিক্রয় রিপোর্ট</h1>
+            <div class="subtitle">
+              ${reportType === 'daily' ? 'দৈনিক রিপোর্ট' : reportType === 'weekly' ? 'সাপ্তাহিক রিপোর্ট' : 'মাসিক রিপোর্ট'}
+            </div>
+            <div class="subtitle">
+              ${startDate.toLocaleDateString()}
+              ${reportType !== 'daily' ? ` থেকে ${endDate.toLocaleDateString()}` : ''}
+            </div>
+          </div>
+
+          <div class="summary-container">
+            <div class="summary-card">
+              <div class="summary-value">${formattedTotal} টাকা</div>
+              <div class="summary-label">মোট বিক্রয়</div>
+            </div>
+            
+            <div class="summary-card">
+              <div class="summary-value">${formattedProfit} টাকা</div>
+              <div class="summary-label">মোট লাভ</div>
+            </div>
+            
+            <div class="summary-card">
+              <div class="summary-value">${salesData.length}</div>
+              <div class="summary-label">মোট অর্ডার</div>
+            </div>
+          </div>
+          
+          <div class="section">
+            <div class="section-title">সর্বাধিক বিক্রিত পণ্য</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>পণ্য</th>
+                  <th style="text-align: center;">পরিমাণ</th>
+                  <th style="text-align: right;">মূল্য</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${productsHTML}
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="section">
+            <div class="section-title">বিক্রয়ের তালিকা</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>তারিখ</th>
+                  <th>কাস্টমার</th>
+                  <th style="text-align: center;">আইটেম</th>
+                  <th style="text-align: right;">মূল্য</th>
+                  <th style="text-align: right;">লাভ</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${salesHTML}
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="footer">
+            ঘর তৈরির সরঞ্জাম সিস্টেম দ্বারা তৈরি 
+            <br>
+            ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}
+          </div>
+        </body>
+      </html>
+    `;
+  };
+  
   const exportPDF = async () => {
     try {
       setLoading(true);
       
-      // Create formatted prices
-      const formattedTotal = totalSales.toLocaleString();
-      const formattedProfit = totalProfit.toLocaleString();
-      
-      // Create top products HTML
-      let productsHTML = '';
-      if (topProducts.length > 0) {
-        topProducts.forEach((product, index) => {
-          productsHTML += `
-            <tr style="border-bottom: 1px solid #eee;">
-              <td style="padding: 8px;">${index + 1}</td>
-              <td style="padding: 8px;">${product.name}</td>
-              <td style="padding: 8px; text-align: center;">${product.quantity}</td>
-              <td style="padding: 8px; text-align: right;">${product.revenue.toLocaleString()} টাকা</td>
-            </tr>
-          `;
-        });
-      } else {
-        productsHTML = `
-          <tr>
-            <td colspan="4" style="text-align: center; padding: 16px;">কোন পণ্য বিক্রয় নেই</td>
-          </tr>
-        `;
-      }
-      
-      // Create sales list HTML
-      let salesHTML = '';
-      if (salesData.length > 0) {
-        salesData.forEach((sale, index) => {
-          salesHTML += `
-            <tr style="border-bottom: 1px solid #eee;">
-              <td style="padding: 8px;">${index + 1}</td>
-              <td style="padding: 8px;">${new Date(sale.date).toLocaleDateString()}</td>
-              <td style="padding: 8px;">${sale.customerName || 'অজানা'}</td>
-              <td style="padding: 8px; text-align: center;">${sale.items.length}</td>
-              <td style="padding: 8px; text-align: right;">${sale.totalAmount.toLocaleString()} টাকা</td>
-              <td style="padding: 8px; text-align: right;">${sale.totalProfit.toLocaleString()} টাকা</td>
-            </tr>
-          `;
-        });
-      } else {
-        salesHTML = `
-          <tr>
-            <td colspan="6" style="text-align: center; padding: 16px;">কোন বিক্রয় নেই</td>
-          </tr>
-        `;
-      }
-      
-      // Create HTML for the PDF
-      const html = `
-        <html>
-          <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
-            <style>
-              body {
-                font-family: 'Helvetica', sans-serif;
-                margin: 0;
-                padding: 16px;
-                color: #333;
-              }
-              .header {
-                text-align: center;
-                margin-bottom: 24px;
-              }
-              h1 {
-                font-size: 24px;
-                margin-bottom: 8px;
-              }
-              .subtitle {
-                font-size: 16px;
-                color: #666;
-                margin-bottom: 4px;
-              }
-              .summary-container {
-                display: flex;
-                justify-content: space-between;
-                margin-bottom: 24px;
-                margin-top: 32px;
-              }
-              .summary-card {
-                background-color: #f7f7f7;
-                border-radius: 8px;
-                padding: 16px;
-                text-align: center;
-                width: 30%;
-              }
-              .summary-value {
-                font-size: 18px;
-                font-weight: bold;
-                margin-bottom: 4px;
-              }
-              .summary-label {
-                font-size: 12px;
-                color: #666;
-              }
-              .section {
-                margin-top: 32px;
-              }
-              .section-title {
-                font-size: 18px;
-                margin-bottom: 16px;
-                padding-bottom: 8px;
-                border-bottom: 2px solid #eee;
-              }
-              table {
-                width: 100%;
-                border-collapse: collapse;
-              }
-              th {
-                background-color: #f2f2f2;
-                padding: 8px;
-                text-align: left;
-                font-size: 14px;
-              }
-              td {
-                padding: 8px 4px;
-                font-size: 12px;
-              }
-              .footer {
-                margin-top: 40px;
-                text-align: center;
-                font-size: 12px;
-                color: #999;
-                padding-top: 16px;
-                border-top: 1px solid #eee;
-              }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <h1>বিক্রয় রিপোর্ট</h1>
-              <div class="subtitle">
-                ${reportType === 'daily' ? 'দৈনিক রিপোর্ট' : reportType === 'weekly' ? 'সাপ্তাহিক রিপোর্ট' : 'মাসিক রিপোর্ট'}
-              </div>
-              <div class="subtitle">
-                ${startDate.toLocaleDateString()}
-                ${reportType !== 'daily' ? ` থেকে ${endDate.toLocaleDateString()}` : ''}
-              </div>
-            </div>
-
-            <div class="summary-container">
-              <div class="summary-card">
-                <div class="summary-value">${formattedTotal} টাকা</div>
-                <div class="summary-label">মোট বিক্রয়</div>
-              </div>
-              
-              <div class="summary-card">
-                <div class="summary-value">${formattedProfit} টাকা</div>
-                <div class="summary-label">মোট লাভ</div>
-              </div>
-              
-              <div class="summary-card">
-                <div class="summary-value">${salesData.length}</div>
-                <div class="summary-label">মোট অর্ডার</div>
-              </div>
-            </div>
-            
-            <div class="section">
-              <div class="section-title">সর্বাধিক বিক্রিত পণ্য</div>
-              <table>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>পণ্য</th>
-                    <th style="text-align: center;">পরিমাণ</th>
-                    <th style="text-align: right;">মূল্য</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${productsHTML}
-                </tbody>
-              </table>
-            </div>
-            
-            <div class="section">
-              <div class="section-title">বিক্রয়ের তালিকা</div>
-              <table>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>তারিখ</th>
-                    <th>কাস্টমার</th>
-                    <th style="text-align: center;">আইটেম</th>
-                    <th style="text-align: right;">মূল্য</th>
-                    <th style="text-align: right;">লাভ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${salesHTML}
-                </tbody>
-              </table>
-            </div>
-            
-            <div class="footer">
-              ঘর তৈরির সরঞ্জাম সিস্টেম দ্বারা তৈরি 
-              <br>
-              ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}
-            </div>
-          </body>
-        </html>
-      `;
+      // Create HTML for the PDF using the helper function
+      const html = generateReactNativePdfHtml();
       
       // Create the PDF file
       const { uri } = await Print.printToFileAsync({ html });
@@ -819,6 +830,8 @@ const styles = StyleSheet.create({
   },
   bar: {
     width: 24,
+    height: '80%', // Changed from percentage string to absolute value
+    maxHeight: 150, // Added max height for safety
     borderTopLeftRadius: 3,
     borderTopRightRadius: 3,
   },

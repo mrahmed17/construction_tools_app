@@ -137,7 +137,7 @@ const HomeScreen = () => {
     if (products && products.length > 0) {
       const lowStockProducts = getLowStockProducts();
       
-      if (lowStockProducts.length > 0) {
+      if (lowStockProducts && lowStockProducts.length > 0) {
         Alert.alert(
           'কম স্টক সতর্কতা',
           `${lowStockProducts.length}টি পণ্যের স্টক কম রয়েছে। দয়া করে যাচাই করুন।`,
@@ -155,7 +155,7 @@ const HomeScreen = () => {
       setStats(prev => ({
         ...prev,
         totalProducts: products.length,
-        lowStockCount: lowStockProducts.length,
+        lowStockCount: lowStockProducts ? lowStockProducts.length : 0,
         totalCategories: Array.isArray(categories) ? categories.length : 0,
       }));
     }
@@ -325,7 +325,7 @@ const HomeScreen = () => {
 
       <View style={styles.recentTransactionsContainer}>
         <Text style={styles.sectionTitle}>সাম্প্রতিক বিক্রয়</Text>
-        {recentTransactions.length > 0 ? (
+        {recentTransactions && recentTransactions.length > 0 ? (
           recentTransactions.map((transaction, index) => (
             <View key={transaction.id} style={styles.transactionCard}>
               <View style={styles.transactionLeft}>
