@@ -7,7 +7,8 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  SafeAreaView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -166,81 +167,111 @@ export default function StockManagementScreen() {
   };
   
   return (
-    <View style={styles.container}>
-      {/* Search and filter controls */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchInputContainer}>
-          <Ionicons name="search-outline" size={20} color="#666" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            value={searchText}
-            onChangeText={setSearchText}
-            placeholder="পণ্য অনুসন্ধান করুন..."
-          />
-          {searchText ? (
-            <TouchableOpacity onPress={() => setSearchText('')} style={styles.clearButton}>
-              <Ionicons name="close-circle" size={20} color="#666" />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-        
-        <TouchableOpacity 
-          style={[styles.filterButton, filterLowStock && styles.filterActive]}
-          onPress={() => setFilterLowStock(!filterLowStock)}
-        >
-          <Ionicons 
-            name="alert-circle-outline" 
-            size={20} 
-            color={filterLowStock ? '#fff' : "#666"} 
-          />
-          <Text style={[styles.filterText, filterLowStock && styles.filterActiveText]}>
-            লো স্টক
-          </Text>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
+        <Text style={styles.headerTitle}>স্টক ব্যবস্থাপনা</Text>
       </View>
       
-      {/* Product list */}
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#344955" />
-          <Text style={styles.loadingText}>Loading products...</Text>
-        </View>
-      ) : filteredProducts.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="cube-outline" size={60} color="#ccc" />
-          <Text style={styles.emptyText}>
-            {searchText || filterLowStock ? 'কোন পণ্য পাওয়া যায়নি' : 'স্টকে কোন পণ্য নেই'}
-          </Text>
-          <TouchableOpacity 
-            style={styles.addProductButton}
-            onPress={navigateToAddProduct}
-          >
-            <Text style={styles.addProductButtonText}>পণ্য যোগ করুন</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <>
-          <FlatList
-            data={filteredProducts}
-            renderItem={renderProductItem}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.productList}
-            showsVerticalScrollIndicator={false}
-          />
+      <View style={styles.container}>
+        {/* Search and filter controls */}
+        <View style={styles.searchContainer}>
+          <View style={styles.searchInputContainer}>
+            <Ionicons name="search-outline" size={20} color="#666" style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              value={searchText}
+              onChangeText={setSearchText}
+              placeholder="পণ্য অনুসন্ধান করুন..."
+            />
+            {searchText ? (
+              <TouchableOpacity onPress={() => setSearchText('')} style={styles.clearButton}>
+                <Ionicons name="close-circle" size={20} color="#666" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
           
           <TouchableOpacity 
-            style={styles.fabButton}
-            onPress={navigateToAddProduct}
+            style={[styles.filterButton, filterLowStock && styles.filterActive]}
+            onPress={() => setFilterLowStock(!filterLowStock)}
           >
-            <Ionicons name="add" size={24} color="#fff" />
+            <Ionicons 
+              name="alert-circle-outline" 
+              size={20} 
+              color={filterLowStock ? '#fff' : "#666"} 
+            />
+            <Text style={[styles.filterText, filterLowStock && styles.filterActiveText]}>
+              লো স্টক
+            </Text>
           </TouchableOpacity>
-        </>
-      )}
-    </View>
+        </View>
+        
+        {/* Product list */}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#344955" />
+            <Text style={styles.loadingText}>Loading products...</Text>
+          </View>
+        ) : filteredProducts.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="cube-outline" size={60} color="#ccc" />
+            <Text style={styles.emptyText}>
+              {searchText || filterLowStock ? 'কোন পণ্য পাওয়া যায়নি' : 'স্টকে কোন পণ্য নেই'}
+            </Text>
+            <TouchableOpacity 
+              style={styles.addProductButton}
+              onPress={navigateToAddProduct}
+            >
+              <Text style={styles.addProductButtonText}>পণ্য যোগ করুন</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            <FlatList
+              data={filteredProducts}
+              renderItem={renderProductItem}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.productList}
+              showsVerticalScrollIndicator={false}
+            />
+            
+            <TouchableOpacity 
+              style={styles.fabButton}
+              onPress={navigateToAddProduct}
+            >
+              <Ionicons name="add" size={24} color="#fff" />
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F5F7FA',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  backButton: {
+    marginRight: 12,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
   container: {
     flex: 1,
     backgroundColor: '#F5F7FA',

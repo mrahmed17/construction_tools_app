@@ -1,522 +1,581 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  Image,
-} from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { MaterialIcons, Ionicons, FontAwesome5, Entypo } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useProducts } from '../context/ProductContext';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { toast } from 'sonner-native';
+import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 
-const HomeScreen = () => {
-  const navigation = useNavigation();
-  // Commented out auth for now as requested
-  // const { user } = useAuth();
-  const { products, categories, getLowStockProducts, loading } = useProducts();
+interface DashboardStats {
+  totalProducts: number;
+  lowStockItems: number;
+  todaySales: number;
+  monthlyRevenue: number;
+}
+
+interface HomeScreenProps {
+  navigation: any;
+}
+
+export default function HomeScreen({ navigation }: HomeScreenProps) {  const [stats, setStats] = useState<DashboardStats>({
+    totalProducts: 245,
+    lowStockItems: 12,
+    todaySales: 15,
+    monthlyRevenue: 125000
+  });
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);  const { user, logout, loading } = useAuth();
   const { cartItems } = useCart();
 
-  // Demo stats
-  const [stats, setStats] = useState({
-    totalProducts: 0,
-    lowStockCount: 0,
-    totalCategories: 0,
-    recentSales: 0,
-  });
-
-  // Recent transactions
-  const [recentTransactions, setRecentTransactions] = useState([]);
-
-  // Add sample sales data for report demo
   useEffect(() => {
-    const addSampleSalesData = async () => {
-      try {
-        // Check if we already have sales data
-        const existingSales = await AsyncStorage.getItem('sales');
-        if (!existingSales) {
-          const pastWeekSales = [];
-          const today = new Date();
-          
-          // Create 30 days of random sales data
-          for (let i = 0; i < 30; i++) {
-            const saleDate = new Date(today);
-            saleDate.setDate(today.getDate() - i);
-            
-            // Generate 1-3 sales for each day
-            const dailySalesCount = Math.floor(Math.random() * 3) + 1;
-            
-            for (let j = 0; j < dailySalesCount; j++) {
-              const itemCount = Math.floor(Math.random() * 5) + 1;
-              const items = [];
-              
-              // Generate random items
-              for (let k = 0; k < itemCount; k++) {
-                const purchasePrice = Math.floor(Math.random() * 1000) + 500;
-                const sellingPrice = purchasePrice + Math.floor(Math.random() * 300);
-                items.push({
-                  id: `item-${Date.now()}-${k}`,
-                  category: ['টিন', 'টুয়া', 'প্লেইন শিট', 'ফুলের শিট'][Math.floor(Math.random() * 4)],
-                  company: ['php', 'KY', 'TK (G)', 'ABUL Khair'][Math.floor(Math.random() * 4)],
-                  product: ['সুপার', 'লুম', 'কালার'][Math.floor(Math.random() * 3)],
-                  quantity: Math.floor(Math.random() * 10) + 1,
-                  purchasePrice,
-                  sellingPrice,
-                  profit: sellingPrice - purchasePrice
-                });
-              }
-              
-              // Calculate totals
-              const totalAmount = items.reduce((sum, item) => sum + (item.sellingPrice * item.quantity), 0);
-              const totalProfit = items.reduce((sum, item) => sum + (item.profit * item.quantity), 0);
-              
-              // Create sale record
-              const sale = {
-                id: `sale-${Date.now()}-${i}-${j}`,
-                date: saleDate.toISOString(),
-                customerName: ['আলি হোসেন', 'করিম মিয়া', 'আব্দুল রহমান', 'মঞ্জুর আলম', 'রফিকুল ইসলাম'][Math.floor(Math.random() * 5)],
-                items,
-                totalAmount,
-                totalProfit,
-                discount: Math.random() > 0.7 ? Math.floor(Math.random() * 500) : 0
-              };
-              
-              pastWeekSales.push(sale);
-            }
-          }
-          
-          // Save to AsyncStorage
-          await AsyncStorage.setItem('sales', JSON.stringify(pastWeekSales));
-          
-          // Also update recent transactions
-          setRecentTransactions(pastWeekSales.slice(0, 5).map(sale => ({
-            id: sale.id,
-            date: sale.date,
-            customerName: sale.customerName,
-            total: sale.totalAmount,
-            items: sale.items.length
-          })));
-          
-          // Update today's sales in stats
-          const todaySales = pastWeekSales.filter(sale => {
-            const saleDate = new Date(sale.date);
-            return saleDate.getDate() === today.getDate() && 
-                   saleDate.getMonth() === today.getMonth() && 
-                   saleDate.getFullYear() === today.getFullYear();
-          });
-          
-          const todayTotal = todaySales.reduce((sum, sale) => sum + sale.totalAmount, 0);
-          
-          setStats(prev => ({
-            ...prev,
-            recentSales: todayTotal
-          }));
-          
-          await AsyncStorage.setItem('recentTransactions', JSON.stringify(pastWeekSales.slice(0, 5).map(sale => ({
-            id: sale.id,
-            date: sale.date,
-            customerName: sale.customerName,
-            total: sale.totalAmount,
-            items: sale.items.length
-          }))));
-        }
-      } catch (error) {
-        console.error('Error adding sample sales data:', error);
-      }
-    };
-    
-    addSampleSalesData();
-  }, []);
-
-  // Check low stock alert
-  useEffect(() => {
-    if (products && products.length > 0) {
-      const lowStockProducts = getLowStockProducts();
-      
-      if (lowStockProducts && lowStockProducts.length > 0) {
-        Alert.alert(
-          'কম স্টক সতর্কতা',
-          `${lowStockProducts.length}টি পণ্যের স্টক কম রয়েছে। দয়া করে যাচাই করুন।`,
-          [
-            { text: 'পরে', style: 'cancel' },
-            { 
-              text: 'স্টক দেখুন', 
-              onPress: () => navigation.navigate('StockManagement' as never) 
-            }
-          ]
-        );
-      }
-      
-      // Update stats
-      setStats(prev => ({
-        ...prev,
-        totalProducts: products.length,
-        lowStockCount: lowStockProducts ? lowStockProducts.length : 0,
-        totalCategories: Array.isArray(categories) ? categories.length : 0,
-      }));
+    if (!loading && !user) {
+      navigation.replace('Auth');
     }
-  }, [products, categories]);
+  }, [user, loading, navigation]);
 
-  // Load recent transactions from AsyncStorage
+  // Show loading screen while checking authentication
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ fontSize: 16, color: '#666' }}>লোড হচ্ছে...</Text>
+      </View>
+    );
+  }
+
+  // If no user, don't render the main screen
+  if (!user) {
+    return null;
+  }
+
   useEffect(() => {
-    const loadTransactions = async () => {
-      try {
-        const savedTransactions = await AsyncStorage.getItem('recentTransactions');
-        if (savedTransactions) {
-          setRecentTransactions(JSON.parse(savedTransactions).slice(0, 5)); // Show only latest 5
-        }
-      } catch (error) {
-        console.error('Error loading transactions:', error);
-      }
-    };
-    
-    loadTransactions();
+    loadDashboardStats();
   }, []);
 
-  const openDrawer = () => {
-    navigation.openDrawer();
+  const loadDashboardStats = async () => {
+    // In real app, this would fetch from API
+    // For now using mock data
   };
-  
-  // Format date
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+
+  const handleLogout = async () => {
+    await logout();
+    navigation.navigate('Auth');
+    toast.success('সফলভাবে লগআউট হয়েছে');
   };
-  
-  // Format currency
-  const formatCurrency = (amount) => {
-    return `৳${amount.toLocaleString()}`;
+
+  const menuItems = [
+    { id: 'dashboard', title: 'ড্যাশবোর্ড', icon: 'home', hasSubmenu: false },
+    { 
+      id: 'products', 
+      title: 'পণ্য ব্যবস্থাপনা', 
+      icon: 'cube', 
+      hasSubmenu: true,
+      submenu: [
+        { id: 'tin', title: 'টিন', icon: 'square' },
+        { id: 'tua', title: 'টুয়া', icon: 'square-outline' },
+        { id: 'plain-sheet', title: 'প্লেইন শিট', icon: 'document' },
+        { id: 'flower-sheet', title: 'ফুলের শিট', icon: 'flower' },
+        { id: 'plastic-tin', title: 'প্লাস্টিকের টিন', icon: 'square' },
+        { id: 'corrugated', title: 'ফুলের ঢেউটিন', icon: 'wave' },
+        { id: 'roofing', title: 'চাচের প্লাস্টিক', icon: 'home' },
+        { id: 'digital-roof', title: 'চাচ ডিজিটাল', icon: 'grid' },
+        { id: 'deep-roof', title: 'ডিপ চাচ', icon: 'layers' },
+        { id: 'coil', title: 'কয়েল (পি-ফোম)', icon: 'disc' },
+        { id: 'aluminum', title: 'অ্যালুমিনিয়াম', icon: 'square' },
+        { id: 'scrap', title: 'ঝালট', icon: 'trash' }
+      ]
+    },
+    { id: 'inventory', title: 'স্টক ব্যবস্থাপনা', icon: 'layers', hasSubmenu: false },
+    { id: 'sales', title: 'বিক্রয়', icon: 'card', hasSubmenu: false },
+    { id: 'suppliers', title: 'সাপ্লাইয়ার', icon: 'people', hasSubmenu: false },
+    { id: 'reports', title: 'রিপোর্ট', icon: 'bar-chart', hasSubmenu: false },
+    { id: 'settings', title: 'সেটিংস', icon: 'settings', hasSubmenu: false }
+  ];
+
+  const quickActions = [
+    { id: 'add-product', title: 'নতুন পণ্য', icon: 'add-circle', color: '#4CAF50' },
+    { id: 'sale', title: 'বিক্রয়', icon: 'card', color: '#2196F3' },
+    { id: 'stock-in', title: 'স্টক ইন', icon: 'arrow-down-circle', color: '#FF9800' },
+    { id: 'low-stock', title: 'কম স্টক', icon: 'warning', color: '#F44336' }
+  ];  const handleQuickAction = (actionId: string) => {
+    switch (actionId) {
+      case 'add-product':
+        navigation.navigate('ProductSelection', { category: 'tin' });
+        break;
+      case 'sale':
+        navigation.navigate('Cart');
+        break;
+      case 'stock-in':
+        navigation.navigate('StockManagement');
+        break;
+      case 'low-stock':
+        navigation.navigate('StockManagement', { filter: 'lowStock' });
+        break;
+      default:
+        toast.success(`${actionId} এ নেভিগেট করা হচ্ছে...`);
+    }
+  };
+
+  const handleMenuItemPress = (itemId: string, subItemId?: string) => {
+    setIsDrawerOpen(false);
+    
+    if (subItemId) {
+      // Navigate to product selection with specific category
+      navigation.navigate('ProductSelection', { category: subItemId });
+    } else {
+      switch (itemId) {
+        case 'dashboard':
+          // Already on dashboard
+          break;
+        case 'inventory':
+          navigation.navigate('StockManagement');
+          break;
+        case 'sales':
+          navigation.navigate('Cart');
+          break;
+        case 'suppliers':
+          navigation.navigate('Supplier');
+          break;
+        case 'settings':
+          toast.success('সেটিংস পেজ শীঘ্রই আসছে...');
+          break;
+        default:
+          toast.success(`${itemId} এ নেভিগেট করা হচ্ছে...`);
+      }
+    }
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={openDrawer}>
-          <Ionicons name="menu" size={30} color="#333" />
+        <TouchableOpacity
+          style={styles.menuButton}
+          onPress={() => setIsDrawerOpen(!isDrawerOpen)}
+        >
+          <Ionicons name="menu" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>ঘর তৈরির সরঞ্জাম</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Cart' as never)}>
-          <View style={styles.cartIconContainer}>
-            <Ionicons name="cart-outline" size={28} color="#333" />
-            {cartItems && cartItems.length > 0 && (
-              <View style={styles.cartBadge}>
-                <Text style={styles.cartBadgeText}>{cartItems.length}</Text>
+        <View style={styles.headerTitle}>
+          <Text style={styles.headerText}>নির্মাণ সামগ্রী ব্যবস্থাপনা</Text>
+          <Text style={styles.headerSubtext}>{user?.businessName || 'আপনার ব্যবসা'}</Text>
+        </View>        <View style={styles.headerActions}>
+          <TouchableOpacity 
+            style={styles.cartButton}
+            onPress={() => navigation.navigate('Cart')}
+          >
+            <Ionicons name="cart" size={24} color="#fff" />
+            {cartItems.length > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{cartItems.length}</Text>
               </View>
             )}
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.notificationButton}>
+            <Ionicons name="notifications" size={24} color="#fff" />
+            {stats.lowStockItems > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{stats.lowStockItems}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <View style={styles.welcomeContainer}>
-        <Text style={styles.welcomeText}>স্বাগতম</Text>
-        <Text style={styles.businessName}>আপনার ব্যবসা</Text>
-      </View>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Welcome Section */}
+        <View style={styles.welcomeSection}>
+          <Text style={styles.welcomeText}>স্বাগতম, {user?.name || 'ব্যবহারকারী'}!</Text>
+          <Text style={styles.welcomeSubtext}>আজকের ব্যবসার অবস্থা দেখুন</Text>
+        </View>
 
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <View style={[styles.statIconContainer, { backgroundColor: '#e3f2fd' }]}>
-            <MaterialIcons name="inventory" size={24} color="#1976d2" />
-          </View>
-          <View>
-            <Text style={styles.statValue}>{stats.totalProducts}</Text>
+        {/* Stats Cards */}
+        <View style={styles.statsContainer}>
+          <View style={[styles.statCard, { backgroundColor: '#E3F2FD' }]}>
+            <Ionicons name="cube" size={24} color="#1976D2" />
+            <Text style={styles.statNumber}>{stats.totalProducts}</Text>
             <Text style={styles.statLabel}>মোট পণ্য</Text>
           </View>
-        </View>
-        
-        <View style={styles.statCard}>
-          <View style={[styles.statIconContainer, { backgroundColor: '#fce4ec' }]}>
-            <MaterialIcons name="warning" size={24} color="#d81b60" />
-          </View>
-          <View>
-            <Text style={styles.statValue}>{stats.lowStockCount}</Text>
+          <View style={[styles.statCard, { backgroundColor: '#FFEBEE' }]}>
+            <Ionicons name="warning" size={24} color="#D32F2F" />
+            <Text style={styles.statNumber}>{stats.lowStockItems}</Text>
             <Text style={styles.statLabel}>কম স্টক</Text>
           </View>
-        </View>
-        
-        <View style={styles.statCard}>
-          <View style={[styles.statIconContainer, { backgroundColor: '#e0f2f1' }]}>
-            <MaterialIcons name="category" size={24} color="#009688" />
-          </View>
-          <View>
-            <Text style={styles.statValue}>{stats.totalCategories}</Text>
-            <Text style={styles.statLabel}>ক্যাটাগরি</Text>
-          </View>
-        </View>
-        
-        <View style={styles.statCard}>
-          <View style={[styles.statIconContainer, { backgroundColor: '#f3e5f5' }]}>
-            <FontAwesome5 name="money-bill-wave" size={18} color="#7b1fa2" />
-          </View>
-          <View>
-            <Text style={styles.statValue}>{formatCurrency(stats.recentSales)}</Text>
+          <View style={[styles.statCard, { backgroundColor: '#E8F5E8' }]}>
+            <Ionicons name="trending-up" size={24} color="#388E3C" />
+            <Text style={styles.statNumber}>{stats.todaySales}</Text>
             <Text style={styles.statLabel}>আজকের বিক্রয়</Text>
           </View>
-        </View>
-      </View>
-
-      <View style={styles.quickActionsContainer}>
-        <Text style={styles.sectionTitle}>দ্রুত অ্যাকশন</Text>
-        <View style={styles.quickActions}>
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => navigation.navigate('ProductSelection' as never)}
-          >
-            <View style={[styles.actionIconContainer, { backgroundColor: '#e3f2fd' }]}>
-              <MaterialIcons name="shopping-bag" size={24} color="#1976d2" />
-            </View>
-            <Text style={styles.actionText}>নতুন বিক্রয়</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => navigation.navigate('StockManagement' as never)}
-          >
-            <View style={[styles.actionIconContainer, { backgroundColor: '#e8f5e9' }]}>
-              <MaterialIcons name="add-box" size={24} color="#388e3c" />
-            </View>
-            <Text style={styles.actionText}>স্টক যোগ করুন</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => navigation.navigate('ProductManagement' as never)}
-          >
-            <View style={[styles.actionIconContainer, { backgroundColor: '#fff3e0' }]}>
-              <MaterialIcons name="edit" size={24} color="#f57c00" />
-            </View>
-            <Text style={styles.actionText}>পণ্য ব্যবস্থাপনা</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => navigation.navigate('Supplier' as never)}
-          >
-            <View style={[styles.actionIconContainer, { backgroundColor: '#f3e5f5' }]}>
-              <Entypo name="users" size={22} color="#7b1fa2" />
-            </View>
-            <Text style={styles.actionText}>সাপ্লায়ার</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => navigation.navigate('PriceConfig' as never)}
-          >
-            <View style={[styles.actionIconContainer, { backgroundColor: '#e0f7fa' }]}>
-              <MaterialIcons name="price-change" size={24} color="#0097a7" />
-            </View>
-            <Text style={styles.actionText}>মূল্য তালিকা</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => navigation.navigate('Report' as never)}
-          >
-            <View style={[styles.actionIconContainer, { backgroundColor: '#fff8e1' }]}>
-              <MaterialIcons name="bar-chart" size={24} color="#ffa000" />
-            </View>
-            <Text style={styles.actionText}>রিপোর্ট</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={styles.recentTransactionsContainer}>
-        <Text style={styles.sectionTitle}>সাম্প্রতিক বিক্রয়</Text>
-        {recentTransactions && recentTransactions.length > 0 ? (
-          recentTransactions.map((transaction, index) => (
-            <View key={transaction.id} style={styles.transactionCard}>
-              <View style={styles.transactionLeft}>
-                <Text style={styles.transactionDate}>{formatDate(transaction.date)}</Text>
-                <Text style={styles.transactionCustomer}>{transaction.customerName}</Text>
-                <Text style={styles.transactionItems}>{transaction.items} টি আইটেম</Text>
-              </View>
-              <View style={styles.transactionRight}>
-                <Text style={styles.transactionAmount}>
-                  {formatCurrency(transaction.total)}
-                </Text>
-              </View>
-            </View>
-          ))
-        ) : (
-          <View style={styles.noTransactionsContainer}>
-            <MaterialIcons name="receipt-long" size={48} color="#bdbdbd" />
-            <Text style={styles.noTransactionsText}>কোন বিক্রয় রেকর্ড নেই</Text>
+          <View style={[styles.statCard, { backgroundColor: '#FFF3E0' }]}>
+            <Ionicons name="cash" size={24} color="#F57C00" />
+            <Text style={styles.statNumber}>৳{stats.monthlyRevenue.toLocaleString()}</Text>
+            <Text style={styles.statLabel}>মাসিক আয়</Text>
           </View>
-        )}
-      </View>
-      
-      <View style={styles.spacer} />
-    </ScrollView>
+        </View>
+
+        {/* Quick Actions */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionTitle}>দ্রুত কাজ</Text>
+          <View style={styles.quickActionsContainer}>
+            {quickActions.map((action) => (
+              <TouchableOpacity
+                key={action.id}
+                style={[styles.quickActionCard, { backgroundColor: action.color }]}
+                onPress={() => handleQuickAction(action.id)}
+              >
+                <Ionicons name={action.icon as any} size={28} color="#fff" />
+                <Text style={styles.quickActionText}>{action.title}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Recent Activity */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionTitle}>সাম্প্রতিক কার্যক্রম</Text>
+          <View style={styles.activityContainer}>
+            <View style={styles.activityItem}>
+              <View style={styles.activityIcon}>
+                <Ionicons name="arrow-down-circle" size={20} color="#4CAF50" />
+              </View>
+              <View style={styles.activityContent}>
+                <Text style={styles.activityTitle}>PHP কোম্পানির সুপার টিন স্টক ইন</Text>
+                <Text style={styles.activitySubtitle}>৫০টি • ২ ঘন্টা আগে</Text>
+              </View>
+            </View>
+            <View style={styles.activityItem}>
+              <View style={styles.activityIcon}>
+                <Ionicons name="card" size={20} color="#2196F3" />
+              </View>
+              <View style={styles.activityContent}>
+                <Text style={styles.activityTitle}>KY কোম্পানির কালার টিন বিক্রয়</Text>
+                <Text style={styles.activitySubtitle}>৳১২,৫০০ • ৩ ঘন্টা আগে</Text>
+              </View>
+            </View>
+            <View style={styles.activityItem}>
+              <View style={styles.activityIcon}>
+                <Ionicons name="warning" size={20} color="#FF9800" />
+              </View>
+              <View style={styles.activityContent}>
+                <Text style={styles.activityTitle}>TK (G) কোম্পানির লুম টিন কম স্টক</Text>
+                <Text style={styles.activitySubtitle}>৫টি বাকি • ৫ ঘন্টা আগে</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Side Drawer */}
+      {isDrawerOpen && (
+        <View style={styles.drawerOverlay}>
+          <TouchableOpacity
+            style={styles.drawerBackdrop}
+            onPress={() => setIsDrawerOpen(false)}
+          />
+          <View style={styles.drawer}>
+            <View style={styles.drawerHeader}>
+              <View style={styles.userInfo}>
+                <View style={styles.userAvatar}>
+                  <Ionicons name="person" size={24} color="#fff" />
+                </View>
+                <View>
+                  <Text style={styles.userName}>{user?.name}</Text>
+                  <Text style={styles.userPhone}>{user?.phone}</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setIsDrawerOpen(false)}
+              >
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.drawerContent}>
+              {menuItems.map((item) => (
+                <View key={item.id}>
+                  <TouchableOpacity style={styles.menuItem}>
+                    <Ionicons name={item.icon as any} size={20} color="#333" />
+                    <Text style={styles.menuItemText}>{item.title}</Text>
+                    {item.hasSubmenu && (
+                      <Ionicons name="chevron-forward" size={16} color="#666" />
+                    )}
+                  </TouchableOpacity>
+                  {item.hasSubmenu && item.submenu && (
+                    <View style={styles.submenuContainer}>
+                      {item.submenu.map((subItem) => (
+                        <TouchableOpacity key={subItem.id} style={styles.submenuItem}>
+                          <Ionicons name={subItem.icon as any} size={16} color="#666" />
+                          <Text style={styles.submenuItemText}>{subItem.title}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      )}
+    </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F5F5F5',
   },
   header: {
+    backgroundColor: '#1976D2',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    paddingTop: 50,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  menuButton: {
+    padding: 8,
   },
   headerTitle: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  headerText: {
+    color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
   },
-  cartIconContainer: {
+  headerSubtext: {
+    color: '#E3F2FD',
+    fontSize: 12,
+  },
+  notificationButton: {
+    padding: 8,
     position: 'relative',
   },
-  cartBadge: {
+  badge: {
     position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: '#f44336',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
-    alignItems: 'center',
+    top: 4,
+    right: 4,
+    backgroundColor: '#F44336',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  cartBadgeText: {
+  badgeText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: 'bold',
   },
-  welcomeContainer: {
-    padding: 16,
-    backgroundColor: '#2196f3',
+  content: {
+    flex: 1,
+  },
+  welcomeSection: {
+    padding: 20,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
   },
   welcomeText: {
-    fontSize: 14,
-    color: '#e3f2fd',
-  },
-  businessName: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 4,
+    color: '#333',
+    marginBottom: 4,
+  },
+  welcomeSubtext: {
+    fontSize: 14,
+    color: '#666',
   },
   statsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 8,
-    backgroundColor: '#fff',
-    marginBottom: 12,
+    padding: 16,
+    gap: 12,
   },
   statCard: {
-    width: '50%',
-    padding: 8,
-  },
-  statIconContainer: {
-    width: 48,
-    height: 48,
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: '#fff',
     borderRadius: 12,
+    padding: 16,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
-  statValue: {
-    fontSize: 18,
+  statNumber: {
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
+    marginTop: 8,
   },
   statLabel: {
-    fontSize: 14,
-    color: '#757575',
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
   },
-  quickActionsContainer: {
-    backgroundColor: '#fff',
-    padding: 16,
-    marginBottom: 12,
+  sectionContainer: {
+    margin: 16,
+    marginTop: 8,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 12,
     color: '#333',
+    marginBottom: 12,
   },
-  quickActions: {
+  quickActionsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    gap: 12,
   },
-  actionButton: {
-    width: '30%',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  actionIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  actionText: {
-    fontSize: 12,
-    textAlign: 'center',
-    color: '#333',
-  },
-  recentTransactionsContainer: {
-    backgroundColor: '#fff',
+  quickActionCard: {
+    flex: 1,
+    minWidth: '45%',
+    borderRadius: 12,
     padding: 16,
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
-  transactionCard: {
+  quickActionText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  activityContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  activityItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#F0F0F0',
   },
-  transactionLeft: {
+  activityIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  activityContent: {
     flex: 1,
   },
-  transactionDate: {
+  activityTitle: {
     fontSize: 14,
-    color: '#757575',
-  },
-  transactionCustomer: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '500',
     color: '#333',
-    marginVertical: 2,
   },
-  transactionItems: {
-    fontSize: 14,
-    color: '#757575',
+  activitySubtitle: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
-  transactionRight: {
+  drawerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+  },
+  drawerBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  drawer: {
+    width: 300,
+    backgroundColor: '#fff',
+    elevation: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: -2, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+  },
+  drawerHeader: {
+    backgroundColor: '#1976D2',
+    padding: 20,
+    paddingTop: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  userAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
-  transactionAmount: {
+  userName: {
+    color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#2196f3',
   },
-  noTransactionsContainer: {
+  userPhone: {
+    color: '#E3F2FD',
+    fontSize: 12,
+  },
+  closeButton: {
+    padding: 4,
+  },
+  drawerContent: {
+    flex: 1,
+  },
+  menuItem: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
-  noTransactionsText: {
+  menuItemText: {
+    flex: 1,
     fontSize: 16,
-    color: '#757575',
-    marginTop: 8,
+    color: '#333',
+    marginLeft: 12,
   },
-  spacer: {
-    height: 20,
+  submenuContainer: {
+    backgroundColor: '#F8F8F8',
+  },
+  submenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingVertical: 12,
+  },
+  submenuItemText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 8,
   },
 });
-
-export default HomeScreen;
