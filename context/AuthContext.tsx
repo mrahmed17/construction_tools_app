@@ -1,66 +1,58 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { User } from '../types';
 
-type User = {
-  id: string;
-  phone: string;
-  name: string;
-};
-
-type AuthContextType = {
+interface AuthContextType {
   user: User | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
   login: (phone: string, password: string) => Promise<boolean>;
-  signup: (phone: string, password: string, name: string) => Promise<boolean>;
+  signup: (userData: Omit<User, 'id' | 'createdAt'>) => Promise<boolean>;
   logout: () => Promise<void>;
-};
+  loading: boolean;
+}
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const useAuth = (): AuthContextType => {
+export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };
 
-export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    // Check for stored user data
-    const loadUser = async () => {
-      try {
-        const userData = await AsyncStorage.getItem('user');
-        if (userData) {
-          setUser(JSON.parse(userData));
-        }
-      } catch (error) {
-        console.error('Failed to load user data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    loadUser();
+    checkAuthStatus();
   }, []);
-  
-  const login = async (phone: string, password: string): Promise<boolean> => {
-    // In a real app, this would call an API
+
+  const checkAuthStatus = async () => {
     try {
-      // Mock successful login
-      if (phone && password) {
-        const newUser = {
-          id: '1',
-          phone,
-          name: 'স্টোর মালিক',
-        };
-        
-        await AsyncStorage.setItem('user', JSON.stringify(newUser));
-        setUser(newUser);
+      const userData = await AsyncStorage.getItem('currentUser');
+      if (userData) {
+        setUser(JSON.parse(userData));
+      }
+    } catch (error) {
+      console.error('Error checking auth status:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const login = async (phone: string, password: string): Promise<boolean> => {
+    try {
+      // Get all users from storage
+      const usersData = await AsyncStorage.getItem('users');
+      const users: User[] = usersData ? JSON.parse(usersData) : [];
+      
+      // Find user with matching phone and password
+      const foundUser = users.find(u => u.phone === phone && u.password === password);
+      
+      if (foundUser) {
+        setUser(foundUser);
+        await AsyncStorage.setItem('currentUser', JSON.stringify(foundUser));
         return true;
       }
       return false;
@@ -69,48 +61,51 @@ export const AuthProvider: React.FC<{children: ReactNode}> = ({ children }) => {
       return false;
     }
   };
-  
-  const signup = async (phone: string, password: string, name: string): Promise<boolean> => {
-    // In a real app, this would call an API
+
+  const signup = async (userData: Omit<User, 'id' | 'createdAt'>): Promise<boolean> => {
     try {
-      if (phone && password && name) {
-        const newUser = {
-          id: '1',
-          phone,
-          name,
-        };
-        
-        await AsyncStorage.setItem('user', JSON.stringify(newUser));
-        setUser(newUser);
-        return true;
+      // Get existing users
+      const usersData = await AsyncStorage.getItem('users');
+      const users: User[] = usersData ? JSON.parse(usersData) : [];
+      
+      // Check if phone already exists
+      if (users.some(u => u.phone === userData.phone)) {
+        return false; // Phone already registered
       }
-      return false;
+      
+      // Create new user
+      const newUser: User = {
+        ...userData,
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString()
+      };
+      
+      // Save to users array
+      users.push(newUser);
+      await AsyncStorage.setItem('users', JSON.stringify(users));
+      
+      // Set as current user
+      setUser(newUser);
+      await AsyncStorage.setItem('currentUser', JSON.stringify(newUser));
+      
+      return true;
     } catch (error) {
       console.error('Signup error:', error);
       return false;
     }
   };
-  
-  const logout = async (): Promise<void> => {
+
+  const logout = async () => {
     try {
-      await AsyncStorage.removeItem('user');
       setUser(null);
+      await AsyncStorage.removeItem('currentUser');
     } catch (error) {
       console.error('Logout error:', error);
     }
   };
-  
+
   return (
-    <AuthContext.Provider 
-      value={{ 
-        user, 
-        isAuthenticated: !!user,
-        isLoading,
-        login,
-        signup,
-        logout
-      }}
-    >
+    <AuthContext.Provider value={{ user, login, signup, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );
