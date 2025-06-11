@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../context/AuthContext';
-import { toast } from 'sonner-native';
+// import { useAuth } from '../context/AuthContext';
+// Authentication is skipped for now
 
 interface AuthScreenProps {
   navigation: any;
@@ -17,39 +17,46 @@ export default function AuthScreen({ navigation }: AuthScreenProps) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const { login, signup, user } = useAuth();
+  // Authentication is skipped for now
+  // const { login, signup, user } = useAuth();
 
-  useEffect(() => {
-    if (user) {
-      navigation.replace('Home');
-    }
-  }, [user]);
+  // useEffect(() => {
+  //   if (user) {
+  //     navigation.replace('Home');
+  //   }
+  // }, [user]);
 
   const handleAuth = async () => {
     if (!phone || !password) {
-      toast.error('ফোন নম্বর এবং পাসওয়ার্ড প্রয়োজন');
+      alert('ফোন নম্বর এবং পাসওয়ার্ড প্রয়োজন');
       return;
     }
 
     if (!isLogin && (!name || !businessName)) {
-      toast.error('সকল তথ্য পূরণ করুন');
+      alert('সকল তথ্য পূরণ করুন');
       return;
     }
 
-    // Validate phone number
-    if (!/^(\+88)?01[3-9]\d{8}$/.test(phone)) {
-      toast.error('সঠিক বাংলাদেশী ফোন নম্বর লিখুন');
+    // Simple phone number validation
+    if (!/^(\\+88)?01[3-9]\d{8}$/.test(phone)) {
+      alert('সঠিক বাংলাদেশী ফোন নম্বর লিখুন');
       return;
     }
 
     if (password.length < 6) {
-      toast.error('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে');
+      alert('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে');
       return;
     }
 
     setLoading(true);
 
     try {
+      // Skip actual auth - just navigate to home
+      setTimeout(() => {
+        navigation.replace('Home');
+      }, 1000);
+
+      /* Authentication is skipped for now
       if (isLogin) {
         const success = await login(phone, password);
         if (success) {
@@ -67,12 +74,18 @@ export default function AuthScreen({ navigation }: AuthScreenProps) {
           toast.error('এই ফোন নম্বর দিয়ে ইতিমধ্যে অ্যাকাউন্ট আছে');
         }
       }
+      */
     } catch (error) {
-      toast.error('কিছু সমস্যা হয়েছে, আবার চেষ্টা করুন');
+      alert('কিছু সমস্যা হয়েছে, আবার চেষ্টা করুন');
     } finally {
       setLoading(false);
     }
   };
+
+  // Skip auth screen and go directly to home for demo purposes
+  React.useEffect(() => {
+    navigation.replace('Home');
+  }, []);
 
   return (
     <KeyboardAvoidingView 
@@ -180,11 +193,18 @@ export default function AuthScreen({ navigation }: AuthScreenProps) {
           </TouchableOpacity>
         </View>
 
+        {/* Skip Auth Button - For Demo */}
+        <TouchableOpacity 
+          style={styles.skipButton}
+          onPress={() => navigation.replace('Home')}
+        >
+          <Text style={styles.skipButtonText}>অ্যাপ দেখুন (লগইন ছাড়া)</Text>
+        </TouchableOpacity>
+
         {/* Demo Info */}
         <View style={styles.demoContainer}>
-          <Text style={styles.demoTitle}>ডেমো অ্যাকাউন্ট:</Text>
-          <Text style={styles.demoText}>ফোন: 01712345678</Text>
-          <Text style={styles.demoText}>পাসওয়ার্ড: 123456</Text>
+          <Text style={styles.demoTitle}>ডেমো মোড:</Text>
+          <Text style={styles.demoText}>অথেনটিকেশন বর্তমানে অফ আছে</Text>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -287,6 +307,19 @@ const styles = StyleSheet.create({
   switchLink: {
     fontSize: 14,
     color: '#1976D2',
+    fontWeight: 'bold',
+  },
+  skipButton: {
+    backgroundColor: '#FF9800',
+    borderRadius: 8,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  skipButtonText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: 'bold',
   },
   demoContainer: {

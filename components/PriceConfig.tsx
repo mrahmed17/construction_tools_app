@@ -1,11 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { toast } from 'sonner-native';
-
-interface PriceConfigProps {
-  navigation: any;
-}
+import { useNavigation } from '@react-navigation/native';
 
 const PRICE_RANGES = {
   tin: {
@@ -26,7 +22,8 @@ const PRICE_RANGES = {
   }
 };
 
-export default function PriceConfig({ navigation }: PriceConfigProps) {
+export default function PriceConfig() {
+  const navigation = useNavigation();
   const [selectedCategory, setSelectedCategory] = useState('tin');
   const [priceData, setPriceData] = useState(PRICE_RANGES);
 
@@ -46,7 +43,7 @@ export default function PriceConfig({ navigation }: PriceConfigProps) {
 
   const savePrices = () => {
     // In real app, save to AsyncStorage or API
-    toast.success('দামের তালিকা সংরক্ষণ করা হয়েছে');
+    Alert.alert('Success', 'দামের তালিকা সংরক্ষণ করা হয়েছে');
   };
 
   return (

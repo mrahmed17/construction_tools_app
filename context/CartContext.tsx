@@ -1,8 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as firebase from 'firebase';
-import { db } from '../App';
-import { useAuth } from './AuthContext';
 
 // Define cart item type
 export type CartItem = {
@@ -60,11 +57,10 @@ export const useCart = () => {
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState<number>(0);
-  const { user } = useAuth();
   
   // Calculate total amount and profit
   const totalAmount = items.reduce((sum, item) => sum + (item.sellingPrice * item.quantity), 0);
-  const totalProfit = items.reduce((sum, item) => sum + (item.profit * item.quantity), 0);
+  const totalProfit = items.reduce((sum, item) => sum + item.profit, 0);
   const netAmount = totalAmount - discount;
   
   // Load cart from AsyncStorage on component mount
@@ -80,47 +76,15 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     };
     
-    // Load cart data from Firebase if online and authenticated
-    const loadCartFromFirebase = async () => {
-      if (user?.uid) {
-        try {
-          const cartDoc = await db.collection('carts').doc(user.uid).get();
-          
-          if (cartDoc.exists) {
-            const firebaseCart = cartDoc.data()?.items || [];
-            
-            // Only update if there are items
-            if (firebaseCart.length > 0) {
-              setItems(firebaseCart);
-              
-              // Also save to local storage for offline access
-              await AsyncStorage.setItem('cart', JSON.stringify(firebaseCart));
-            }
-          }
-        } catch (error) {
-          console.error('Error loading cart from Firebase:', error);
-        }
-      }
-    };
-    
     loadCartFromStorage();
-    loadCartFromFirebase();
-  }, [user?.uid]);
+  }, []);
   
-  // Save cart to AsyncStorage and Firebase whenever it changes
+  // Save cart to AsyncStorage whenever it changes
   useEffect(() => {
     const saveCart = async () => {
       try {
         // Save to local storage
         await AsyncStorage.setItem('cart', JSON.stringify(items));
-        
-        // Save to Firebase if online and authenticated
-        if (user?.uid) {
-          await db.collection('carts').doc(user.uid).set({
-            items,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          });
-        }
       } catch (error) {
         console.error('Error saving cart:', error);
       }
@@ -130,7 +94,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (items.length > 0) {
       saveCart();
     }
-  }, [items, user?.uid]);
+  }, [items]);
   
   // Add item to cart
   const addItem = (item: Omit<CartItem, 'id'>) => {
@@ -163,12 +127,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     // Also clear from storage
     AsyncStorage.removeItem('cart');
-    
-    // Clear from Firebase if authenticated
-    if (user?.uid) {
-      db.collection('carts').doc(user.uid).delete()
-        .catch(error => console.error('Error clearing Firebase cart:', error));
-    }
   };
   
   const value = {

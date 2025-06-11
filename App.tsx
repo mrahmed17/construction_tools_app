@@ -5,48 +5,14 @@ import { StatusBar } from 'expo-status-bar';
 import HomeScreen from './screens/HomeScreen';
 import ProductSelectionScreen from './screens/ProductSelectionScreen';
 import CartScreen from './screens/CartScreen';
-import AuthScreen from './screens/AuthScreen';
 import StockManagementScreen from './screens/StockManagementScreen';
 import SupplierScreen from './screens/SupplierScreen';
+import AuthScreen from './screens/AuthScreen';
+import ProductManagementScreen from './screens/ProductManagementScreen';
 import PriceConfig from './components/PriceConfig';
-import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
+import { AuthProvider } from './context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as firebase from 'firebase';
-import 'firebase/firestore';
-import 'firebase/storage';
-
-// Firebase configuration - normally these would be in environment variables
-// but for the purpose of this example, we'll include them directly
-const firebaseConfig = {
-  apiKey: "your-api-key",
-  authDomain: "construction-materials-app.firebaseapp.com",
-  projectId: "construction-materials-app",
-  storageBucket: "construction-materials-app.appspot.com",
-  messagingSenderId: "your-sender-id",
-  appId: "your-app-id"
-};
-
-// Initialize Firebase if it hasn't been initialized already
-if (!firebase.apps.length) {
-  firebase.initializeApp(firebaseConfig);
-} else {
-  firebase.app();
-}
-
-// Create a reference to Firestore and Storage
-export const db = firebase.firestore();
-export const storage = firebase.storage();
-
-// Set up offline persistence for Firestore
-db.enablePersistence()
-  .catch((err) => {
-    if (err.code === 'failed-precondition') {
-      console.log('Multiple tabs open, persistence can only be enabled in one tab at a time.');
-    } else if (err.code === 'unimplemented') {
-      console.log('The current browser does not support all of the features required to enable persistence.');
-    }
-  });
 
 const Drawer = createDrawerNavigator();
 
@@ -77,9 +43,31 @@ export default function App() {
       <CartProvider>
         <NavigationContainer>
           <StatusBar style="auto" />
-          <Drawer.Navigator initialRouteName="Home">
-            <Drawer.Screen name="Home" component={HomeScreen} />
-            <Drawer.Screen name="Auth" component={AuthScreen} options={{ title: 'লগইন/সাইনআপ' }} />
+          <Drawer.Navigator 
+            initialRouteName="Auth"
+            screenOptions={{
+              headerStyle: {
+                backgroundColor: '#4CAF50',
+              },
+              headerTintColor: '#fff',
+              headerTitleStyle: {
+                fontWeight: 'bold',
+              },
+              drawerActiveTintColor: '#4CAF50',
+              drawerLabelStyle: {
+                fontSize: 16,
+              }
+            }}
+          >
+            <Drawer.Screen 
+              name="Auth" 
+              component={AuthScreen} 
+              options={{ 
+                title: 'লগইন', 
+                drawerItemStyle: { display: 'none' } 
+              }} 
+            />
+            <Drawer.Screen name="Home" component={HomeScreen} options={{ title: 'হোম' }} />
             <Drawer.Screen 
               name="ProductSelection" 
               component={ProductSelectionScreen} 
@@ -100,6 +88,11 @@ export default function App() {
               name="PriceConfig" 
               component={PriceConfig} 
               options={{ title: 'মূল্য সেটিংস' }}
+            />
+            <Drawer.Screen 
+              name="ProductManagement" 
+              component={ProductManagementScreen} 
+              options={{ title: 'প্রোডাক্ট ম্যানেজমেন্ট' }}
             />
           </Drawer.Navigator>
         </NavigationContainer>
