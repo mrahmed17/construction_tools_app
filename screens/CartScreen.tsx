@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,414 +7,373 @@ import {
   ScrollView,
   TextInput,
   Alert,
-  Modal,
-  Platform,
-  SafeAreaView
+  Modal
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Ionicons, MaterialIcons, FontAwesome } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCart } from '../context/CartContext';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+// import { useCart } from '../context/CartContext';
+
+// Mock cart items for now until we have useCart implemented
+const mockCartItems = [
+  {
+    id: '1',
+    category: 'টিন',
+    company: 'PHP',
+    productType: 'কালার',
+    color: 'CNG (ডার্ক গ্রীন)',
+    size: '৬ ফুট',
+    thickness: '০.১৮০',
+    quantity: 5,
+    purchasePrice: 1200,
+    sellingPrice: 1400,
+    profit: 1000
+  },
+  {
+    id: '2',
+    category: 'টুয়া',
+    company: 'KY',
+    productType: 'NOF',
+    size: '৮ ফুট',
+    thickness: '০.২২০',
+    quantity: 3,
+    purchasePrice: 1500,
+    sellingPrice: 1800,
+    profit: 900
+  },
+  {
+    id: '3',
+    category: 'ফুলের শিট',
+    productType: 'টাইপ ১',
+    size: '১০ ফুট',
+    thickness: '০.২০০',
+    quantity: 2,
+    purchasePrice: 1800,
+    sellingPrice: 2200,
+    profit: 800
+  }
+];
 
 export default function CartScreen() {
   const navigation = useNavigation();
-  const { cartItems, updateCartItemQuantity, removeFromCart, clearCart } = useCart();
-
-  // Customer info
+  // const { items, removeItem, updateQuantity, clearCart, getTotalAmount, getTotalProfit } = useCart();
+  
   const [customerName, setCustomerName] = useState('');
-  const [customerMobile, setCustomerMobile] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
+  const [discount, setDiscount] = useState('0');
+  const [paidAmount, setPaidAmount] = useState('0');
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   
-  // Payment info
-  const [subtotal, setSubtotal] = useState(0);
-  const [discountPercent, setDiscountPercent] = useState('0');
-  const [discountAmount, setDiscountAmount] = useState(0);
-  const [totalAmount, setTotalAmount] = useState(0);
-  const [advanceAmount, setAdvanceAmount] = useState('0');
-  const [dueAmount, setDueAmount] = useState(0);
+  // Use mock data for now
+  const cartItems = mockCartItems;
   
-  // Checkout modal
-  const [checkoutModalVisible, setCheckoutModalVisible] = useState(false);
+  const totalAmount = cartItems.reduce(
+    (total, item) => total + item.sellingPrice * item.quantity, 
+    0
+  );
   
-  // Calculate totals
-  useEffect(() => {
-    if (!cartItems) return;
-    
-    const subTotal = cartItems.reduce(
-      (acc, item) => acc + (item.salePrice * (item.quantity || 1)), 0
-    );
-    
-    setSubtotal(subTotal);
-    
-    const discount = (parseFloat(discountPercent) / 100) * subTotal;
-    setDiscountAmount(discount);
-    
-    const total = subTotal - discount;
-    setTotalAmount(total);
-    
-    const advance = parseFloat(advanceAmount) || 0;
-    setDueAmount(Math.max(0, total - advance));
-    
-  }, [cartItems, discountPercent, advanceAmount]);
-
-  const handleIncreaseQuantity = (id) => {
-    if (!cartItems) return;
-    const item = cartItems.find(item => item.id === id);
-    if (item) {
-      updateCartItemQuantity(id, (item.quantity || 1) + 1);
-    }
-  };
-
-  const handleDecreaseQuantity = (id) => {
-    if (!cartItems) return;
-    const item = cartItems.find(item => item.id === id);
-    if (item && item.quantity > 1) {
-      updateCartItemQuantity(id, item.quantity - 1);
-    }
-  };
-
-  const handleRemoveItem = (id) => {
+  const totalProfit = cartItems.reduce(
+    (total, item) => total + item.profit, 
+    0
+  );
+  
+  const discountAmount = parseFloat(discount) || 0;
+  const finalAmount = totalAmount - discountAmount;
+  const paidAmountValue = parseFloat(paidAmount) || 0;
+  const dueAmount = finalAmount - paidAmountValue;
+  
+  const handleRemoveItem = (id: string) => {
     Alert.alert(
-      'নিশ্চিত করুন',
-      'আপনি কি এই পণ্যটি কার্ট থেকে সরাতে চান?',
+      'নিশ্চিতকরণ',
+      'আপনি কি এই আইটেমটি মুছতে চান?',
       [
-        { text: 'না', style: 'cancel' },
-        { text: 'হ্যাঁ', onPress: () => removeFromCart(id) }
+        {
+          text: 'না',
+          style: 'cancel'
+        },
+        {
+          text: 'হ্যাঁ',
+          onPress: () => {
+            // In a real app: removeItem(id);
+            Alert.alert('আইটেম মুছে ফেলা হয়েছে');
+          }
+        }
       ]
     );
   };
-
-  const handleCheckout = () => {
-    if (!cartItems || cartItems.length === 0) {
-      Alert.alert('ত্রুটি', 'কার্টে কোন পণ্য নেই।');
-      return;
-    }
-    
-    setCheckoutModalVisible(true);
-  };
-
-  const handleCompleteCheckout = async () => {
-    if (!customerName) {
-      Alert.alert('ত্রুটি', 'কাস্টমারের নাম লিখুন।');
-      return;
-    }
-    
-    try {
-      // Create transaction record
-      const transaction = {
-        id: Date.now().toString(),
-        date: new Date().toISOString(),
-        customerName,
-        customerMobile,
-        customerAddress,
-        items: cartItems,
-        subtotal,
-        discountPercent: parseFloat(discountPercent),
-        discountAmount,
-        total: totalAmount,
-        advance: parseFloat(advanceAmount) || 0,
-        due: dueAmount,
-      };
-      
-      // Save to AsyncStorage
-      const savedTransactions = await AsyncStorage.getItem('recentTransactions');
-      const transactions = savedTransactions ? JSON.parse(savedTransactions) : [];
-      transactions.unshift(transaction);
-      await AsyncStorage.setItem('recentTransactions', JSON.stringify(transactions));
-      
-      // Clear cart and close modal
-      clearCart();
-      setCheckoutModalVisible(false);
-      
-      // Reset form
-      setCustomerName('');
-      setCustomerMobile('');
-      setCustomerAddress('');
-      setDiscountPercent('0');
-      setAdvanceAmount('0');
-      
-      // Show success message
-      Alert.alert(
-        'সফল',
-        'বিক্রয় সম্পন্ন হয়েছে।',
-        [
-          { text: 'ঠিক আছে', onPress: () => navigation.navigate('Home' as never) }
-        ]
-      );
-    } catch (error) {
-      console.error('Checkout error:', error);
-      Alert.alert('ত্রুটি', 'বিক্রয় সম্পন্ন করতে সমস্যা হয়েছে।');
-    }
-  };
-
-  // Calculate profit amount
-  const calculateProfit = (item) => {
-    const sellingPrice = item.salePrice || 0;
-    const purchasePrice = item.purchasePrice || 0;
-    return (sellingPrice - purchasePrice) * (item.quantity || 1);
+  
+  const increaseQuantity = (id: string, currentQuantity: number) => {
+    // In a real app: updateQuantity(id, currentQuantity + 1);
   };
   
-  // Format currency
-  const formatCurrency = (amount) => {
-    return `৳${amount.toLocaleString('bn-BD')}`;
+  const decreaseQuantity = (id: string, currentQuantity: number) => {
+    if (currentQuantity > 1) {
+      // In a real app: updateQuantity(id, currentQuantity - 1);
+    }
+  };
+  
+  const handleCheckout = () => {
+    // Validation
+    if (!customerName.trim()) {
+      Alert.alert('গ্রাহক নাম প্রয়োজন', 'গ্রাহকের নাম দিন');
+      return;
+    }
+    
+    setConfirmModalVisible(true);
+  };
+  
+  const confirmCheckout = () => {
+    // In a real app, this would save the order to the database and clear the cart
+    
+    const invoice = {
+      id: `INV-${Date.now()}`,
+      customerName: customerName.trim(),
+      customerPhone: customerPhone.trim(),
+      customerAddress: customerAddress.trim(),
+      items: cartItems,
+      totalAmount,
+      discount: discountAmount,
+      finalAmount,
+      totalProfit,
+      date: new Date(),
+      paidAmount: paidAmountValue,
+      dueAmount,
+    };
+    
+    // Save the invoice to the database
+    // clearCart();
+    
+    setConfirmModalVisible(false);
+    Alert.alert('সফল', 'বিক্রয় সম্পন্ন হয়েছে', [
+      {
+        text: 'ঠিক আছে',
+        onPress: () => navigation.navigate('Home' as never)
+      }
+    ]);
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={24} color="#000" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>আপনার কার্ট</Text>
-          {cartItems && cartItems.length > 0 && (
-            <TouchableOpacity
-              style={styles.clearButton}
-              onPress={() => {
-                Alert.alert(
-                  'নিশ্চিত করুন',
-                  'আপনি কি কার্ট পরিষ্কার করতে চান?',
-                  [
-                    { text: 'না', style: 'cancel' },
-                    { text: 'হ্যাঁ', onPress: () => clearCart() }
-                  ]
-                );
-              }}
-            >
-              <MaterialIcons name="delete-sweep" size={24} color="#ff5722" />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {!cartItems || cartItems.length === 0 ? (
-          <View style={styles.emptyCartContainer}>
-            <MaterialIcons name="shopping-cart" size={80} color="#e0e0e0" />
-            <Text style={styles.emptyCartText}>আপনার কার্ট খালি</Text>
-            <TouchableOpacity
-              style={styles.shopNowButton}
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>কার্ট</Text>
+        <TouchableOpacity onPress={() => Alert.alert('কার্ট সাফ করুন?', 'আপনি কি কার্ট সাফ করতে চান?', [
+          { text: 'না', style: 'cancel' },
+          { text: 'হ্যাঁ', onPress: () => {
+            // In a real app: clearCart();
+            Alert.alert('কার্ট সাফ করা হয়েছে');
+          }}
+        ])}>
+          <Ionicons name="trash-outline" size={24} color="#333" />
+        </TouchableOpacity>
+      </View>
+      
+      <ScrollView style={styles.content}>
+        {cartItems.length === 0 ? (
+          <View style={styles.emptyCart}>
+            <Ionicons name="cart-outline" size={80} color="#ccc" />
+            <Text style={styles.emptyCartText}>কার্ট খালি</Text>
+            <TouchableOpacity 
+              style={styles.emptyCartButton}
               onPress={() => navigation.navigate('ProductSelection' as never)}
             >
-              <Text style={styles.shopNowButtonText}>পণ্য নির্বাচন করুন</Text>
+              <Text style={styles.emptyCartButtonText}>পণ্য যোগ করুন</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <>
-            <ScrollView style={styles.cartItemsContainer}>
-              {cartItems.map((item) => (
-                <View key={item.id} style={styles.cartItem}>
-                  <View style={styles.itemInfo}>
-                    <View>
-                      <Text style={styles.itemCategory}>{item.category}</Text>
-                      <Text style={styles.itemDetails}>
-                        {item.company ? `${item.company}, ` : ''}
-                        {item.type ? `${item.type}, ` : ''}
-                        {item.color ? `${item.color}, ` : ''}
-                        {item.thickness ? `${item.thickness} মিমি, ` : ''}
-                        {item.size}
-                      </Text>
-                    </View>
-                    
-                    <View style={styles.priceContainer}>
-                      <Text style={styles.itemPrice}>
-                        {formatCurrency(item.salePrice || 0)} × {item.quantity || 1}
-                      </Text>
-                      <Text style={styles.itemTotalPrice}>
-                        {formatCurrency((item.salePrice || 0) * (item.quantity || 1))}
-                      </Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.itemActions}>
-                    <View style={styles.quantityControl}>
-                      <TouchableOpacity
-                        style={styles.quantityButton}
-                        onPress={() => handleDecreaseQuantity(item.id)}
-                      >
-                        <Text style={styles.quantityButtonText}>-</Text>
-                      </TouchableOpacity>
-                      
-                      <Text style={styles.quantityText}>{item.quantity || 1}</Text>
-                      
-                      <TouchableOpacity
-                        style={styles.quantityButton}
-                        onPress={() => handleIncreaseQuantity(item.id)}
-                      >
-                        <Text style={styles.quantityButtonText}>+</Text>
-                      </TouchableOpacity>
-                    </View>
-                    
-                    <TouchableOpacity
-                      style={styles.removeButton}
-                      onPress={() => handleRemoveItem(item.id)}
+            {/* Cart Items */}
+            {cartItems.map(item => (
+              <View key={item.id} style={styles.cartItem}>
+                <View style={styles.cartItemHeader}>
+                  <Text style={styles.cartItemCategory}>
+                    {item.category} {item.company ? `• ${item.company}` : ''} • {item.productType}
+                  </Text>
+                  <TouchableOpacity onPress={() => handleRemoveItem(item.id)}>
+                    <Ionicons name="close-circle" size={22} color="#FF3B30" />
+                  </TouchableOpacity>
+                </View>
+                
+                <View style={styles.cartItemDetails}>
+                  {item.color && <Text style={styles.detailText}>কালার: {item.color}</Text>}
+                  {item.size && <Text style={styles.detailText}>সাইজ: {item.size}</Text>}
+                  {item.thickness && <Text style={styles.detailText}>পুরুত্ব: {item.thickness}</Text>}
+                </View>
+                
+                <View style={styles.cartItemFooter}>
+                  <View style={styles.quantityControls}>
+                    <TouchableOpacity 
+                      style={styles.quantityButton}
+                      onPress={() => decreaseQuantity(item.id, item.quantity)}
                     >
-                      <MaterialIcons name="delete" size={20} color="#fff" />
+                      <Ionicons name="remove" size={18} color="#333" />
+                    </TouchableOpacity>
+                    <Text style={styles.quantityText}>{item.quantity}</Text>
+                    <TouchableOpacity 
+                      style={styles.quantityButton}
+                      onPress={() => increaseQuantity(item.id, item.quantity)}
+                    >
+                      <Ionicons name="add" size={18} color="#333" />
                     </TouchableOpacity>
                   </View>
                   
-                  <View style={styles.profitContainer}>
-                    <Text style={styles.profitText}>
-                      লাভ: {formatCurrency(calculateProfit(item))}
-                    </Text>
+                  <View style={styles.priceContainer}>
+                    <Text style={styles.priceLabel}>দাম:</Text>
+                    <Text style={styles.priceValue}>৳{item.sellingPrice}/টি = ৳{item.sellingPrice * item.quantity}</Text>
                   </View>
                 </View>
-              ))}
-            </ScrollView>
+              </View>
+            ))}
+            
+            {/* Customer Information */}
+            <View style={styles.sectionTitle}>
+              <MaterialIcons name="person" size={24} color="#333" />
+              <Text style={styles.sectionTitleText}>গ্রাহকের তথ্য</Text>
+            </View>
+            
+            <View style={styles.formContainer}>
+              <View style={styles.inputRow}>
+                <Text style={styles.inputLabel}>নাম</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="গ্রাহকের নাম"
+                  value={customerName}
+                  onChangeText={setCustomerName}
+                />
+              </View>
+              
+              <View style={styles.inputRow}>
+                <Text style={styles.inputLabel}>মোবাইল</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="গ্রাহকের মোবাইল নম্বর"
+                  keyboardType="phone-pad"
+                  value={customerPhone}
+                  onChangeText={setCustomerPhone}
+                />
+              </View>
+              
+              <View style={styles.inputRow}>
+                <Text style={styles.inputLabel}>ঠিকানা</Text>
+                <TextInput
+                  style={[styles.input, styles.addressInput]}
+                  placeholder="গ্রাহকের ঠিকানা"
+                  multiline
+                  numberOfLines={3}
+                  value={customerAddress}
+                  onChangeText={setCustomerAddress}
+                />
+              </View>
+            </View>
+            
+            {/* Order Summary */}
+            <View style={styles.sectionTitle}>
+              <MaterialIcons name="receipt" size={24} color="#333" />
+              <Text style={styles.sectionTitleText}>বিল সারসংক্ষেপ</Text>
+            </View>
             
             <View style={styles.summaryContainer}>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>মোট পণ্য</Text>
-                <Text style={styles.summaryValue}>{cartItems ? cartItems.length : 0}</Text>
+                <Text style={styles.summaryLabel}>মোট মূল্য</Text>
+                <Text style={styles.summaryValue}>৳{totalAmount.toFixed(2)}</Text>
               </View>
               
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>সাবটোটাল</Text>
-                <Text style={styles.summaryValue}>{formatCurrency(subtotal)}</Text>
-              </View>
-              
-              <View style={styles.summaryRow}>
+              <View style={styles.discountRow}>
                 <Text style={styles.summaryLabel}>ডিসকাউন্ট</Text>
-                <Text style={styles.summaryValue}>{formatCurrency(discountAmount)}</Text>
+                <TextInput
+                  style={styles.discountInput}
+                  placeholder="0"
+                  keyboardType="numeric"
+                  value={discount}
+                  onChangeText={setDiscount}
+                />
               </View>
               
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabelTotal}>মোট</Text>
-                <Text style={styles.summaryValueTotal}>{formatCurrency(totalAmount)}</Text>
+                <Text style={styles.summaryLabel}>সর্বমোট</Text>
+                <Text style={styles.finalAmount}>৳{finalAmount.toFixed(2)}</Text>
               </View>
               
-              <TouchableOpacity
-                style={styles.checkoutButton}
-                onPress={handleCheckout}
-              >
-                <Text style={styles.checkoutButtonText}>চেকআউট</Text>
-                <MaterialIcons name="arrow-forward" size={20} color="#fff" />
-              </TouchableOpacity>
+              <View style={styles.discountRow}>
+                <Text style={styles.summaryLabel}>প্রদানকৃত</Text>
+                <TextInput
+                  style={styles.discountInput}
+                  placeholder="0"
+                  keyboardType="numeric"
+                  value={paidAmount}
+                  onChangeText={setPaidAmount}
+                />
+              </View>
+              
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>বাকি</Text>
+                <Text style={[styles.finalAmount, dueAmount > 0 ? styles.dueAmount : null]}>
+                  ৳{dueAmount.toFixed(2)}
+                </Text>
+              </View>
+              
+              <View style={styles.profitRow}>
+                <Text style={styles.profitLabel}>মোট লাভ:</Text>
+                <Text style={styles.profitValue}>৳{totalProfit.toFixed(2)}</Text>
+              </View>
             </View>
+            
+            {/* Checkout Button */}
+            <TouchableOpacity style={styles.checkoutButton} onPress={handleCheckout}>
+              <Text style={styles.checkoutButtonText}>বিক্রয় সম্পন্ন করুন</Text>
+            </TouchableOpacity>
           </>
         )}
-        
-        {/* Checkout Modal */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={checkoutModalVisible}
-          onRequestClose={() => setCheckoutModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>বিক্রয় সম্পন্ন করুন</Text>
+      </ScrollView>
+      
+      {/* Confirm Checkout Modal */}
+      <Modal
+        visible={confirmModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setConfirmModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>বিক্রয় নিশ্চিতকরণ</Text>
+            
+            <Text style={styles.modalText}>গ্রাহক: {customerName}</Text>
+            <Text style={styles.modalText}>মোট আইটেম: {cartItems.length}</Text>
+            <Text style={styles.modalText}>সর্বমোট: ৳{finalAmount.toFixed(2)}</Text>
+            
+            {dueAmount > 0 && (
+              <Text style={[styles.modalText, styles.dueText]}>বাকি: ৳{dueAmount.toFixed(2)}</Text>
+            )}
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setConfirmModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>বাতিল</Text>
+              </TouchableOpacity>
               
-              <ScrollView style={styles.modalScrollView}>
-                <Text style={styles.modalSectionTitle}>কাস্টমার তথ্য</Text>
-                
-                <Text style={styles.inputLabel}>কাস্টমারের নাম *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={customerName}
-                  onChangeText={setCustomerName}
-                  placeholder="কাস্টমারের নাম লিখুন"
-                />
-                
-                <Text style={styles.inputLabel}>মোবাইল নম্বর</Text>
-                <TextInput
-                  style={styles.input}
-                  value={customerMobile}
-                  onChangeText={setCustomerMobile}
-                  placeholder="মোবাইল নম্বর লিখুন"
-                  keyboardType="phone-pad"
-                />
-                
-                <Text style={styles.inputLabel}>ঠিকানা</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  value={customerAddress}
-                  onChangeText={setCustomerAddress}
-                  placeholder="ঠিকানা লিখুন"
-                  multiline
-                  numberOfLines={3}
-                />
-                
-                <Text style={styles.modalSectionTitle}>অর্থ প্রদান</Text>
-                
-                <Text style={styles.inputLabel}>ডিসকাউন্ট (%)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={discountPercent}
-                  onChangeText={setDiscountPercent}
-                  placeholder="ডিসকাউন্ট শতাংশ"
-                  keyboardType="numeric"
-                />
-                
-                <Text style={styles.inputLabel}>অগ্রিম (৳)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={advanceAmount}
-                  onChangeText={setAdvanceAmount}
-                  placeholder="অগ্রিম পরিমাণ"
-                  keyboardType="numeric"
-                />
-                
-                <View style={styles.paymentSummary}>
-                  <View style={styles.paymentRow}>
-                    <Text style={styles.paymentLabel}>সাবটোটাল:</Text>
-                    <Text style={styles.paymentValue}>{formatCurrency(subtotal)}</Text>
-                  </View>
-                  
-                  <View style={styles.paymentRow}>
-                    <Text style={styles.paymentLabel}>ডিসকাউন্ট:</Text>
-                    <Text style={styles.paymentValue}>- {formatCurrency(discountAmount)}</Text>
-                  </View>
-                  
-                  <View style={styles.paymentRow}>
-                    <Text style={styles.paymentLabel}>মোট:</Text>
-                    <Text style={styles.paymentValue}>{formatCurrency(totalAmount)}</Text>
-                  </View>
-                  
-                  <View style={styles.paymentRow}>
-                    <Text style={styles.paymentLabel}>অগ্রিম:</Text>
-                    <Text style={styles.paymentValue}>{formatCurrency(parseFloat(advanceAmount) || 0)}</Text>
-                  </View>
-                  
-                  <View style={[styles.paymentRow, styles.dueRow]}>
-                    <Text style={styles.dueLabel}>বাকি:</Text>
-                    <Text style={styles.dueValue}>{formatCurrency(dueAmount)}</Text>
-                  </View>
-                </View>
-                
-                <View style={styles.modalButtonContainer}>
-                  <TouchableOpacity
-                    style={styles.cancelButton}
-                    onPress={() => setCheckoutModalVisible(false)}
-                  >
-                    <Text style={styles.cancelButtonText}>বাতিল</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={styles.confirmButton}
-                    onPress={handleCompleteCheckout}
-                  >
-                    <Text style={styles.confirmButtonText}>সম্পন্ন করুন</Text>
-                  </TouchableOpacity>
-                </View>
-              </ScrollView>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.confirmButton]}
+                onPress={confirmCheckout}
+              >
+                <Text style={styles.confirmButtonText}>নিশ্চিত করুন</Text>
+              </TouchableOpacity>
             </View>
           </View>
-        </Modal>
-      </View>
-    </SafeAreaView>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#f5f5f5',
   },
   header: {
     flexDirection: 'row',
@@ -423,287 +382,273 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  backButton: {
-    padding: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
   },
-  clearButton: {
-    padding: 8,
-  },
-  emptyCartContainer: {
+  content: {
     flex: 1,
-    justifyContent: 'center',
+    padding: 16,
+  },
+  emptyCart: {
     alignItems: 'center',
-    paddingHorizontal: 24,
+    justifyContent: 'center',
+    padding: 48,
   },
   emptyCartText: {
     fontSize: 18,
-    color: '#757575',
+    color: '#888',
     marginVertical: 16,
   },
-  shopNowButton: {
-    backgroundColor: '#2196f3',
-    paddingVertical: 12,
+  emptyCartButton: {
+    backgroundColor: '#007AFF',
     paddingHorizontal: 24,
-    borderRadius: 6,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 16,
   },
-  shopNowButtonText: {
+  emptyCartButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
-  },
-  cartItemsContainer: {
-    flex: 1,
+    fontWeight: '600',
   },
   cartItem: {
     backgroundColor: '#fff',
-    marginHorizontal: 12,
-    marginTop: 12,
-    borderRadius: 8,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
     elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  itemInfo: {
+  cartItemHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  itemCategory: {
+  cartItemCategory: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#333',
   },
-  itemDetails: {
+  cartItemDetails: {
+    marginBottom: 12,
+  },
+  detailText: {
     fontSize: 14,
-    color: '#666',
-    marginTop: 4,
+    color: '#555',
+    marginBottom: 4,
+  },
+  cartItemFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    paddingTop: 12,
+  },
+  quantityControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 6,
+  },
+  quantityButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  quantityText: {
+    paddingHorizontal: 12,
+    fontSize: 16,
   },
   priceContainer: {
     alignItems: 'flex-end',
   },
-  itemPrice: {
-    fontSize: 14,
-    color: '#666',
+  priceLabel: {
+    fontSize: 12,
+    color: '#888',
   },
-  itemTotalPrice: {
+  priceValue: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2196f3',
-  },
-  itemActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  quantityControl: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  quantityButton: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#e0e0e0',
-  },
-  quantityButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  quantityText: {
-    width: 32,
-    textAlign: 'center',
-    fontSize: 16,
-  },
-  removeButton: {
-    backgroundColor: '#f44336',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  profitContainer: {
-    marginTop: 10,
-    backgroundColor: '#e8f5e9',
-    padding: 8,
-    borderRadius: 4,
-  },
-  profitText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#388e3c',
-  },
-  summaryContainer: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
-  },
-  summaryLabel: {
-    fontSize: 15,
-    color: '#666',
-  },
-  summaryValue: {
-    fontSize: 15,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#333',
   },
-  summaryLabelTotal: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  summaryValueTotal: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2196f3',
-  },
-  checkoutButton: {
-    backgroundColor: '#4caf50',
+  sectionTitle: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 6,
-    marginTop: 12,
-  },
-  checkoutButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginRight: 8,
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    margin: 16,
-    borderRadius: 10,
-    maxHeight: '90%',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  modalScrollView: {
-    padding: 16,
-  },
-  modalSectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    marginTop: 24,
     marginBottom: 12,
-    color: '#2196f3',
+  },
+  sectionTitleText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginLeft: 8,
+  },
+  formContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  inputRow: {
+    marginBottom: 12,
   },
   inputLabel: {
     fontSize: 14,
-    fontWeight: 'bold',
+    color: '#666',
     marginBottom: 4,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 6,
+    borderColor: '#ddd',
+    borderRadius: 8,
     padding: 10,
-    marginBottom: 12,
-    backgroundColor: '#f9f9f9',
+    fontSize: 16,
   },
-  textArea: {
-    height: 80,
+  addressInput: {
+    minHeight: 80,
     textAlignVertical: 'top',
   },
-  paymentSummary: {
-    backgroundColor: '#f5f5f5',
-    padding: 12,
-    borderRadius: 6,
-    marginVertical: 12,
+  summaryContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
   },
-  paymentRow: {
+  summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 6,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  paymentLabel: {
-    fontSize: 15,
-    color: '#666',
+  summaryLabel: {
+    fontSize: 16,
+    color: '#555',
   },
-  paymentValue: {
-    fontSize: 15,
-    fontWeight: 'bold',
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: '600',
     color: '#333',
   },
-  dueRow: {
-    marginTop: 6,
-    paddingTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-  },
-  dueLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#d32f2f',
-  },
-  dueValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#d32f2f',
-  },
-  modalButtonContainer: {
+  discountRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 16,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  discountInput: {
+    width: 120,
+    textAlign: 'right',
+    fontSize: 16,
+    fontWeight: '600',
+    padding: 4,
+  },
+  finalAmount: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#007AFF',
+  },
+  dueAmount: {
+    color: '#FF3B30',
+  },
+  profitRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  profitLabel: {
+    fontSize: 14,
+    color: '#555',
+    marginRight: 8,
+  },
+  profitValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  checkoutButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  checkoutButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    width: '80%',
+    borderRadius: 16,
+    padding: 24,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
     marginBottom: 16,
   },
-  cancelButton: {
-    backgroundColor: '#f44336',
-    padding: 14,
-    borderRadius: 6,
+  modalText: {
+    fontSize: 16,
+    color: '#555',
+    marginBottom: 8,
+  },
+  dueText: {
+    color: '#FF3B30',
+    fontWeight: '600',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 24,
+  },
+  modalButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
     flex: 1,
-    marginRight: 8,
     alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#f1f1f1',
+    marginRight: 8,
   },
   cancelButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+    color: '#666',
     fontSize: 16,
+    fontWeight: '600',
   },
   confirmButton: {
-    backgroundColor: '#4caf50',
-    padding: 14,
-    borderRadius: 6,
-    flex: 1,
+    backgroundColor: '#4CAF50',
     marginLeft: 8,
-    alignItems: 'center',
   },
   confirmButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
     fontSize: 16,
+    fontWeight: '600',
   },
 });

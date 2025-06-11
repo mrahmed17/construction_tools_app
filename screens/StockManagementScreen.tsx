@@ -1,444 +1,549 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
+  TouchableOpacity,
+  ScrollView,
   FlatList,
   TextInput,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  SafeAreaView
+  Modal,
+  Alert
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ProductType } from '../types';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
+import { StockItem, PRODUCT_CATEGORIES } from '../types';
+
+// Mock stock data
+const mockStockItems: StockItem[] = [
+  {
+    id: '1',
+    category: 'টিন',
+    company: 'PHP',
+    productType: 'কালার',
+    color: 'CNG (ডার্ক গ্রীন)',
+    size: '৬ ফুট',
+    thickness: '০.১৮০',
+    currentStock: 50,
+    lowStockThreshold: 10,
+    purchasePrice: 1200,
+    sellingPrice: 1400
+  },
+  {
+    id: '2',
+    category: 'টুয়া',
+    company: 'KY',
+    productType: 'NOF',
+    size: '৮ ফুট',
+    thickness: '০.২২০',
+    currentStock: 8,
+    lowStockThreshold: 10,
+    purchasePrice: 1500,
+    sellingPrice: 1800
+  },
+  {
+    id: '3',
+    category: 'ফুলের শিট',
+    productType: 'টাইপ ১',
+    size: '১০ ফুট',
+    thickness: '০.২০০',
+    currentStock: 20,
+    lowStockThreshold: 5,
+    purchasePrice: 1800,
+    sellingPrice: 2200
+  }
+];
+
+type StockAction = 'in' | 'out';
 
 export default function StockManagementScreen() {
   const navigation = useNavigation();
-  const [products, setProducts] = useState<ProductType[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<ProductType[]>([]);
-  const [searchText, setSearchText] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [filterLowStock, setFilterLowStock] = useState(false);
   
-  // Load products on component mount
-  useEffect(() => {
-    loadProducts();
-  }, []);
+  const [stockItems] = useState<StockItem[]>(mockStockItems);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [stockActionModalVisible, setStockActionModalVisible] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<StockItem | null>(null);
+  const [stockAction, setStockAction] = useState<StockAction>('in');
+  const [quantity, setQuantity] = useState('');
+  const [supplier, setSupplier] = useState('');
+  const [notes, setNotes] = useState('');
   
-  // Filter products when search text changes
-  useEffect(() => {
-    filterProducts();
-  }, [searchText, products, filterLowStock]);
+  const filteredItems = searchQuery
+    ? stockItems.filter(item => 
+        item.category.includes(searchQuery) ||
+        (item.company && item.company.includes(searchQuery)) ||
+        item.productType.includes(searchQuery) ||
+        (item.color && item.color.includes(searchQuery)) ||
+        (item.size && item.size.includes(searchQuery)) ||
+        (item.thickness && item.thickness.includes(searchQuery))
+      )
+    : stockItems;
   
-  // Load products from storage
-  const loadProducts = async () => {
-    try {
-      setLoading(true);
-      const productsJson = await AsyncStorage.getItem('products');
-      
-      if (productsJson) {
-        const loadedProducts: ProductType[] = JSON.parse(productsJson);
-        setProducts(loadedProducts);
-      } else {
-        setProducts([]);
-      }
-    } catch (error) {
-      console.error('Error loading products:', error);
-      Alert.alert('Error', 'Failed to load product data');
-    } finally {
-      setLoading(false);
-    }
+  const openStockActionModal = (item: StockItem, action: StockAction) => {
+    setSelectedItem(item);
+    setStockAction(action);
+    setQuantity('');
+    setSupplier('');
+    setNotes('');
+    setStockActionModalVisible(true);
   };
   
-  // Filter products based on search text and low stock filter
-  const filterProducts = () => {
-    let filtered = [...products];
-    
-    // Apply search filter if text exists
-    if (searchText) {
-      const lowerCaseSearch = searchText.toLowerCase();
-      filtered = filtered.filter(p => 
-        (p.name && p.name.toLowerCase().includes(lowerCaseSearch)) ||
-        (p.category && p.category.toLowerCase().includes(lowerCaseSearch)) ||
-        (p.companyName && p.companyName.toLowerCase().includes(lowerCaseSearch)) ||
-        (p.productType && p.productType.toLowerCase().includes(lowerCaseSearch))
-      );
+  const handleStockAction = () => {
+    // Validate quantity
+    const quantityValue = parseInt(quantity);
+    if (!quantityValue || quantityValue <= 0) {
+      Alert.alert('সঠিক পরিমাণ দিন', 'পরিমাণ শূন্যের চেয়ে বড় হতে হবে।');
+      return;
     }
     
-    // Apply low stock filter if enabled
-    if (filterLowStock) {
-      filtered = filtered.filter(p => p.stock <= p.lowStockThreshold);
+    // For stock out, check if we have enough
+    if (stockAction === 'out' && selectedItem && quantityValue > selectedItem.currentStock) {
+      Alert.alert('পর্যাপ্ত স্টক নেই', `বর্তমান স্টক: ${selectedItem.currentStock}`);
+      return;
     }
     
-    setFilteredProducts(filtered);
+    // In a real app, this would update the database
+    // Mock: Update the UI to show the change was processed
+    Alert.alert(
+      'সফল',
+      stockAction === 'in' 
+        ? `${quantityValue} পরিমাণ যোগ করা হয়েছে`
+        : `${quantityValue} পরিমাণ বিক্রয় করা হয়েছে`,
+      [{ text: 'ঠিক আছে', onPress: () => setStockActionModalVisible(false) }]
+    );
   };
-  
-  // Update stock for a product
-  const updateProductStock = async (productId: string, newStock: number) => {
-    try {
-      // Find the product in the array
-      const updatedProducts = products.map(product => {
-        if (product.id === productId) {
-          return { ...product, stock: newStock };
-        }
-        return product;
-      });
-      
-      // Update state
-      setProducts(updatedProducts);
-      
-      // Update in storage
-      await AsyncStorage.setItem('products', JSON.stringify(updatedProducts));
-      
-      Alert.alert('Success', 'স্টক আপডেট হয়েছে');
-    } catch (error) {
-      console.error('Error updating stock:', error);
-      Alert.alert('Error', 'স্টক আপডেট করতে ব্যর্থ হয়েছে');
-    }
-  };
-  
-  // Add stock to a product
-  const addStock = (product: ProductType, amount: number) => {
-    const newStock = product.stock + amount;
-    updateProductStock(product.id, newStock);
-  };
-  
-  // Render each product item in the list
-  const renderProductItem = ({ item }: { item: ProductType }) => {
-    const isLowStock = item.stock <= item.lowStockThreshold;
-    
+
+  const renderStockItem = ({ item }: { item: StockItem }) => {
+    const isLowStock = item.currentStock <= item.lowStockThreshold;
+
     return (
-      <View style={[styles.productItem, isLowStock ? styles.lowStockItem : {}]}>
-        <View style={styles.productInfo}>
-          <Text style={styles.productName}>
-            {item.name || `${item.category} - ${item.companyName || ''}`}
+      <View style={styles.stockItem}>
+        <View style={styles.stockItemHeader}>
+          <Text style={styles.stockItemCategory}>
+            {item.category} {item.company ? `• ${item.company}` : ''} • {item.productType}
           </Text>
-          <Text style={styles.productDetails}>
-            {item.category} {item.companyName ? `- ${item.companyName}` : ''}
-            {item.productType ? ` - ${item.productType}` : ''}
-            {item.color ? ` - ${item.color}` : ''}
-            {item.thickness ? ` - ${item.thickness}mm` : ''}
-            {item.size ? ` - ${item.size}ft` : ''}
-          </Text>
+          <View style={[styles.stockBadge, isLowStock ? styles.lowStockBadge : styles.normalStockBadge]}>
+            <Text style={styles.stockBadgeText}>{isLowStock ? 'কম স্টক' : 'স্টক আছে'}</Text>
+          </View>
         </View>
         
-        <View style={styles.stockContainer}>
-          <Text style={[styles.stockText, isLowStock ? styles.lowStockText : {}]}>
-            Stock: {item.stock}
-          </Text>
-          {isLowStock && (
-            <Text style={styles.lowStockAlert}>লো স্টক!</Text>
-          )}
+        <View style={styles.stockItemDetails}>
+          {item.color && <Text style={styles.detailText}>কালার: {item.color}</Text>}
+          {item.size && <Text style={styles.detailText}>সাইজ: {item.size}</Text>}
+          {item.thickness && <Text style={styles.detailText}>পুরুত্ব: {item.thickness}</Text>}
+        </View>
+        
+        <View style={styles.stockItemInfo}>
+          <View style={styles.stockCount}>
+            <Text style={styles.stockCountLabel}>বর্তমান স্টক:</Text>
+            <Text style={[styles.stockCountValue, isLowStock && styles.lowStockText]}>{item.currentStock}</Text>
+          </View>
+          
+          <View style={styles.stockCount}>
+            <Text style={styles.stockCountLabel}>ক্রয় মূল্য:</Text>
+            <Text style={styles.stockCountValue}>৳{item.purchasePrice}</Text>
+          </View>
+          
+          <View style={styles.stockCount}>
+            <Text style={styles.stockCountLabel}>বিক্রয় মূল্য:</Text>
+            <Text style={styles.stockCountValue}>৳{item.sellingPrice}</Text>
+          </View>
         </View>
         
         <View style={styles.stockActions}>
           <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => addStock(item, 1)}
+            style={[styles.actionButton, styles.stockInButton]}
+            onPress={() => openStockActionModal(item, 'in')}
           >
-            <Text style={styles.actionButtonText}>+1</Text>
+            <Ionicons name="add-circle" size={18} color="#4CAF50" />
+            <Text style={styles.stockInButtonText}>স্টক যোগ</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => addStock(item, 5)}
+            style={[styles.actionButton, styles.stockOutButton]}
+            onPress={() => openStockActionModal(item, 'out')}
           >
-            <Text style={styles.actionButtonText}>+5</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => addStock(item, 10)}
-          >
-            <Text style={styles.actionButtonText}>+10</Text>
+            <Ionicons name="remove-circle" size={18} color="#FF3B30" />
+            <Text style={styles.stockOutButtonText}>স্টক বিক্রয়</Text>
           </TouchableOpacity>
         </View>
       </View>
     );
   };
-  
-  // Add a new product to inventory
-  const navigateToAddProduct = () => {
-    // @ts-ignore
-    navigation.navigate('ProductManagement');
-  };
-  
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#000" />
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>স্টক ব্যবস্থাপনা</Text>
+        <Text style={styles.headerTitle}>স্টক ম্যানেজমেন্ট</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('ProductSelection' as never)}>
+          <Ionicons name="add-circle-outline" size={24} color="#333" />
+        </TouchableOpacity>
       </View>
       
-      <View style={styles.container}>
-        {/* Search and filter controls */}
-        <View style={styles.searchContainer}>
-          <View style={styles.searchInputContainer}>
-            <Ionicons name="search-outline" size={20} color="#666" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              value={searchText}
-              onChangeText={setSearchText}
-              placeholder="পণ্য অনুসন্ধান করুন..."
-            />
-            {searchText ? (
-              <TouchableOpacity onPress={() => setSearchText('')} style={styles.clearButton}>
-                <Ionicons name="close-circle" size={20} color="#666" />
-              </TouchableOpacity>
-            ) : null}
-          </View>
-          
-          <TouchableOpacity 
-            style={[styles.filterButton, filterLowStock && styles.filterActive]}
-            onPress={() => setFilterLowStock(!filterLowStock)}
-          >
-            <Ionicons 
-              name="alert-circle-outline" 
-              size={20} 
-              color={filterLowStock ? '#fff' : "#666"} 
-            />
-            <Text style={[styles.filterText, filterLowStock && styles.filterActiveText]}>
-              লো স্টক
-            </Text>
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color="#777" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="পণ্য অনুসন্ধান করুন..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery ? (
+          <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
+            <Ionicons name="close" size={20} color="#777" />
           </TouchableOpacity>
-        </View>
-        
-        {/* Product list */}
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#344955" />
-            <Text style={styles.loadingText}>Loading products...</Text>
-          </View>
-        ) : filteredProducts.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="cube-outline" size={60} color="#ccc" />
-            <Text style={styles.emptyText}>
-              {searchText || filterLowStock ? 'কোন পণ্য পাওয়া যায়নি' : 'স্টকে কোন পণ্য নেই'}
-            </Text>
-            <TouchableOpacity 
-              style={styles.addProductButton}
-              onPress={navigateToAddProduct}
-            >
-              <Text style={styles.addProductButtonText}>পণ্য যোগ করুন</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            <FlatList
-              data={filteredProducts}
-              renderItem={renderProductItem}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.productList}
-              showsVerticalScrollIndicator={false}
-            />
-            
-            <TouchableOpacity 
-              style={styles.fabButton}
-              onPress={navigateToAddProduct}
-            >
-              <Ionicons name="add" size={24} color="#fff" />
-            </TouchableOpacity>
-          </>
-        )}
+        ) : null}
       </View>
-    </SafeAreaView>
+      
+      {/* Stock List */}
+      {filteredItems.length > 0 ? (
+        <FlatList
+          data={filteredItems}
+          renderItem={renderStockItem}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.listContainer}
+        />
+      ) : (
+        <View style={styles.emptyContainer}>
+          <FontAwesome5 name="box-open" size={60} color="#ccc" />
+          <Text style={styles.emptyText}>কোন পণ্য পাওয়া যায়নি</Text>
+        </View>
+      )}
+      
+      {/* Stock Action Modal */}
+      <Modal
+        visible={stockActionModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setStockActionModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {stockAction === 'in' ? 'স্টক যোগ করুন' : 'স্টক বিক্রয় করুন'}
+            </Text>
+            
+            {selectedItem && (
+              <View style={styles.selectedItemInfo}>
+                <Text style={styles.selectedItemTitle}>
+                  {selectedItem.category} {selectedItem.company ? `• ${selectedItem.company}` : ''} • {selectedItem.productType}
+                </Text>
+                <View style={styles.selectedItemDetails}>
+                  {selectedItem.color && <Text style={styles.detailText}>কালার: {selectedItem.color}</Text>}
+                  {selectedItem.size && <Text style={styles.detailText}>সাইজ: {selectedItem.size}</Text>}
+                  {selectedItem.thickness && <Text style={styles.detailText}>পুরুত্ব: {selectedItem.thickness}</Text>}
+                  <Text style={styles.detailText}>বর্তমান স্টক: {selectedItem.currentStock}</Text>
+                </View>
+              </View>
+            )}
+            
+            <View style={styles.inputRow}>
+              <Text style={styles.inputLabel}>পরিমাণ</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="পরিমাণ"
+                keyboardType="numeric"
+                value={quantity}
+                onChangeText={setQuantity}
+              />
+            </View>
+            
+            {stockAction === 'in' && (
+              <View style={styles.inputRow}>
+                <Text style={styles.inputLabel}>সাপ্লায়ার</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="সাপ্লায়ারের নাম (ঐচ্ছিক)"
+                  value={supplier}
+                  onChangeText={setSupplier}
+                />
+              </View>
+            )}
+            
+            <View style={styles.inputRow}>
+              <Text style={styles.inputLabel}>নোট</Text>
+              <TextInput
+                style={[styles.input, styles.textAreaInput]}
+                placeholder="অতিরিক্ত তথ্য (ঐচ্ছিক)"
+                multiline
+                numberOfLines={3}
+                value={notes}
+                onChangeText={setNotes}
+              />
+            </View>
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setStockActionModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>বাতিল</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[
+                  styles.modalButton, 
+                  stockAction === 'in' ? styles.confirmInButton : styles.confirmOutButton
+                ]}
+                onPress={handleStockAction}
+              >
+                <Text style={styles.confirmButtonText}>
+                  {stockAction === 'in' ? 'যোগ করুন' : 'বিক্রয় করুন'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
+    backgroundColor: '#f5f5f5',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  backButton: {
-    marginRight: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F7FA',
   },
   searchContainer: {
     flexDirection: 'row',
-    padding: 16,
-    backgroundColor: 'white',
     alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  searchInputContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    marginRight: 10,
-  },
   searchIcon: {
-    paddingLeft: 10,
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    padding: 10,
     fontSize: 16,
+    padding: 8,
   },
   clearButton: {
-    padding: 10,
+    padding: 4,
   },
-  filterButton: {
+  listContainer: {
+    padding: 16,
+  },
+  stockItem: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  stockItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  stockItemCategory: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    flex: 1,
+  },
+  stockBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  normalStockBadge: {
+    backgroundColor: '#E0FFEA',
+  },
+  lowStockBadge: {
+    backgroundColor: '#FFEBEB',
+  },
+  stockBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+  },
+  stockItemDetails: {
+    marginBottom: 12,
+  },
+  detailText: {
+    fontSize: 14,
+    color: '#555',
+    marginBottom: 4,
+  },
+  stockItemInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    marginBottom: 12,
+  },
+  stockCount: {
+    alignItems: 'center',
+  },
+  stockCountLabel: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 4,
+  },
+  stockCountValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  lowStockText: {
+    color: '#FF3B30',
+  },
+  stockActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    padding: 10,
-  },
-  filterActive: {
-    backgroundColor: '#E57373',
-  },
-  filterText: {
-    marginLeft: 5,
-    fontSize: 14,
-    color: '#666',
-  },
-  filterActiveText: {
-    color: '#fff',
-  },
-  loadingContainer: {
-    flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: 8,
+    flex: 1,
   },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
+  stockInButton: {
+    backgroundColor: '#E0FFEA',
+    marginRight: 8,
+  },
+  stockOutButton: {
+    backgroundColor: '#FFEBEB',
+    marginLeft: 8,
+  },
+  stockInButtonText: {
+    color: '#4CAF50',
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  stockOutButtonText: {
+    color: '#FF3B30',
+    fontWeight: '600',
+    marginLeft: 4,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 32,
   },
   emptyText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 20,
-  },
-  addProductButton: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 4,
-  },
-  addProductButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  productList: {
-    padding: 16,
-  },
-  productItem: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
-    elevation: 2,
-  },
-  lowStockItem: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#E57373',
-  },
-  productInfo: {
-    marginBottom: 10,
-  },
-  productName: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#344955',
-    marginBottom: 4,
+    color: '#888',
+    marginTop: 16,
   },
-  productDetails: {
-    fontSize: 14,
-    color: '#4A6572',
-  },
-  stockContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  stockText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#344955',
-  },
-  lowStockText: {
-    color: '#E57373',
-    fontWeight: 'bold',
-  },
-  lowStockAlert: {
-    color: '#E57373',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  stockActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  actionButton: {
-    backgroundColor: '#344955',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 4,
-    marginLeft: 8,
-  },
-  actionButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  fabButton: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    backgroundColor: '#4CAF50',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    width: '85%',
+    borderRadius: 16,
+    padding: 24,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 16,
+  },
+  selectedItemInfo: {
+    padding: 12,
+    backgroundColor: '#f7f7f7',
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  selectedItemTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  selectedItemDetails: {
+  },
+  inputRow: {
+    marginBottom: 12,
+  },
+  inputLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 16,
+  },
+  textAreaInput: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
+  modalButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    flex: 1,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#f1f1f1',
+    marginRight: 8,
+  },
+  confirmInButton: {
+    backgroundColor: '#4CAF50',
+    marginLeft: 8,
+  },
+  confirmOutButton: {
+    backgroundColor: '#FF3B30',
+    marginLeft: 8,
+  },
+  cancelButtonText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  confirmButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
