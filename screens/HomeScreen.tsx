@@ -1,302 +1,433 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  Image,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialIcons, Ionicons, FontAwesome5, Entypo } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAuth } from '../context/AuthContext';
-import { ProductType } from '../types';
-import * as Notifications from 'expo-notifications';
-import Constants from 'expo-constants';
+import { useProducts } from '../context/ProductContext';
+import { useCart } from '../context/CartContext';
 
-export default function HomeScreen() {
+const HomeScreen = () => {
   const navigation = useNavigation();
-  const { user } = useAuth();
-  const [totalProducts, setTotalProducts] = useState(0);
-  const [lowStockCount, setLowStockCount] = useState(0);
-  const [totalStockValue, setTotalStockValue] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+  // Commented out auth for now as requested
+  // const { user } = useAuth();
+  const { products, categories, getLowStockProducts, loading } = useProducts();
+  const { cartItems } = useCart();
 
-  // Request notification permissions on mount
+  // Demo stats
+  const [stats, setStats] = useState({
+    totalProducts: 0,
+    lowStockCount: 0,
+    totalCategories: 0,
+    recentSales: 0,
+  });
+
+  // Recent transactions
+  const [recentTransactions, setRecentTransactions] = useState([]);
+
+  // Check low stock alert
   useEffect(() => {
-    async function registerForPushNotifications() {
-      if (Constants.isDevice) {
-        const { status: existingStatus } = await Notifications.getPermissionsAsync();
-        let finalStatus = existingStatus;
-        if (existingStatus !== 'granted') {
-          const { status } = await Notifications.requestPermissionsAsync();
-          finalStatus = status;
-        }
-        if (finalStatus !== 'granted') {
-          console.log('Notification permissions not granted');
-        }
+    if (products && products.length > 0) {
+      const lowStockProducts = getLowStockProducts();
+      
+      if (lowStockProducts.length > 0) {
+        Alert.alert(
+          'কম স্টক সতর্কতা',
+          `${lowStockProducts.length}টি পণ্যের স্টক কম রয়েছে। দয়া করে যাচাই করুন।`,
+          [
+            { text: 'পরে', style: 'cancel' },
+            { 
+              text: 'স্টক দেখুন', 
+              onPress: () => navigation.navigate('StockManagement' as never) 
+            }
+          ]
+        );
       }
-    }
-    registerForPushNotifications();
-  }, []);
-
-  useEffect(() => {
-    loadStats();
-  }, []);
-
-  // Send local notification when low stock items detected
-  useEffect(() => {
-    if (lowStockCount > 0) {
-      Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'লো স্টক এলার্ট',
-          body: `${lowStockCount} টি পণ্য লো স্টকে আছে`
-        },
-        trigger: null
+      
+      // Update stats
+      setStats({
+        totalProducts: products.length,
+        lowStockCount: lowStockProducts.length,
+        totalCategories: Array.isArray(categories) ? categories.length : 0,
+        recentSales: 0, // Will be loaded later
       });
     }
-  }, [lowStockCount]);
+  }, [products, categories]);
 
-  const loadStats = async () => {
-    try {
-      setIsLoading(true);
-      const productsJson = await AsyncStorage.getItem('products');
-      if (productsJson) {
-        const products: ProductType[] = JSON.parse(productsJson);
-        setTotalProducts(products.length);
-        
-        // Calculate low stock items
-        const lowStock = products.filter(p => p.stock <= p.lowStockThreshold);
-        setLowStockCount(lowStock.length);
-        
-        // Calculate total stock value
-        const stockValue = products.reduce((total, product) => {
-          return total + (product.buyPrice * product.stock);
-        }, 0);
-        setTotalStockValue(stockValue);
+  // Load recent transactions from AsyncStorage
+  useEffect(() => {
+    const loadTransactions = async () => {
+      try {
+        const savedTransactions = await AsyncStorage.getItem('recentTransactions');
+        if (savedTransactions) {
+          setRecentTransactions(JSON.parse(savedTransactions).slice(0, 5)); // Show only latest 5
+        } else {
+          // Demo transactions
+          const demoTransactions = [
+            { 
+              id: '1',
+              date: new Date().toISOString(),
+              customerName: 'আলি হোসেন',
+              total: 15000,
+              items: 3
+            },
+            {
+              id: '2',
+              date: new Date(Date.now() - 86400000).toISOString(), // Yesterday
+              customerName: 'করিম মিয়া',
+              total: 8500,
+              items: 2
+            }
+          ];
+          
+          setRecentTransactions(demoTransactions);
+          await AsyncStorage.setItem('recentTransactions', JSON.stringify(demoTransactions));
+        }
+      } catch (error) {
+        console.error('Error loading transactions:', error);
       }
-    } catch (error) {
-      console.error('Error loading stats:', error);
-      Alert.alert('Error', 'Failed to load dashboard statistics');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    };
+    
+    loadTransactions();
+  }, []);
 
-  const navigateTo = (screen: string) => {
-    // @ts-ignore - We'll handle type safety when implementing full navigation
-    navigation.navigate(screen);
+  const openDrawer = () => {
+    navigation.openDrawer();
+  };
+  
+  // Format date
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+  };
+  
+  // Format currency
+  const formatCurrency = (amount) => {
+    return `৳${amount.toLocaleString()}`;
   };
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>ঘর তৈরির সরঞ্জাম</Text>
-        <Text style={styles.subtitle}>
-          {user ? `স্বাগতম, ${user.displayName || 'ব্যবহারকারী'}` : 'স্বাগতম'}
-        </Text>
+        <TouchableOpacity onPress={openDrawer}>
+          <Ionicons name="menu" size={30} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>ঘর তৈরির সরঞ্জাম</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('Cart' as never)}>
+          <View style={styles.cartIconContainer}>
+            <Ionicons name="cart-outline" size={28} color="#333" />
+            {cartItems.length > 0 && (
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartBadgeText}>{cartItems.length}</Text>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
       </View>
 
-      {/* Stats Cards */}
+      <View style={styles.welcomeContainer}>
+        <Text style={styles.welcomeText}>স্বাগতম</Text>
+        <Text style={styles.businessName}>আপনার ব্যবসা</Text>
+      </View>
+
       <View style={styles.statsContainer}>
-        <View style={[styles.card, styles.statCard]}>
-          <Ionicons name="cube-outline" size={32} color="#4A6572" />
-          <Text style={styles.statValue}>{totalProducts}</Text>
-          <Text style={styles.statLabel}>মোট পণ্য</Text>
+        <View style={styles.statCard}>
+          <View style={[styles.statIconContainer, { backgroundColor: '#e3f2fd' }]}>
+            <MaterialIcons name="inventory" size={24} color="#1976d2" />
+          </View>
+          <View>
+            <Text style={styles.statValue}>{stats.totalProducts}</Text>
+            <Text style={styles.statLabel}>মোট পণ্য</Text>
+          </View>
         </View>
         
-        <View style={[styles.card, styles.statCard]}>
-          <Ionicons name="alert-circle-outline" size={32} color={lowStockCount > 0 ? "#E57373" : "#4A6572"} />
-          <Text style={[styles.statValue, lowStockCount > 0 ? styles.alertText : {}]}>{lowStockCount}</Text>
-          <Text style={styles.statLabel}>লো স্টক</Text>
+        <View style={styles.statCard}>
+          <View style={[styles.statIconContainer, { backgroundColor: '#fce4ec' }]}>
+            <MaterialIcons name="warning" size={24} color="#d81b60" />
+          </View>
+          <View>
+            <Text style={styles.statValue}>{stats.lowStockCount}</Text>
+            <Text style={styles.statLabel}>কম স্টক</Text>
+          </View>
         </View>
-
-        <View style={[styles.card, styles.statCard]}>
-          <Ionicons name="cash-outline" size={32} color="#4A6572" />
-          <Text style={styles.statValue}>৳{totalStockValue.toLocaleString()}</Text>
-          <Text style={styles.statLabel}>মোট স্টক মূল্য</Text>
+        
+        <View style={styles.statCard}>
+          <View style={[styles.statIconContainer, { backgroundColor: '#e0f2f1' }]}>
+            <MaterialIcons name="category" size={24} color="#009688" />
+          </View>
+          <View>
+            <Text style={styles.statValue}>{stats.totalCategories}</Text>
+            <Text style={styles.statLabel}>ক্যাটাগরি</Text>
+          </View>
+        </View>
+        
+        <View style={styles.statCard}>
+          <View style={[styles.statIconContainer, { backgroundColor: '#f3e5f5' }]}>
+            <FontAwesome5 name="money-bill-wave" size={18} color="#7b1fa2" />
+          </View>
+          <View>
+            <Text style={styles.statValue}>{formatCurrency(stats.recentSales)}</Text>
+            <Text style={styles.statLabel}>আজকের বিক্রয়</Text>
+          </View>
         </View>
       </View>
 
-      {/* Quick Actions */}
-      <Text style={styles.sectionTitle}>দ্রুত অ্যাকশন</Text>
       <View style={styles.quickActionsContainer}>
-        <TouchableOpacity 
-          style={[styles.card, styles.actionCard]} 
-          onPress={() => navigateTo('ProductSelection')}
-        >
-          <Ionicons name="cart-outline" size={28} color="#344955" />
-          <Text style={styles.actionText}>নতুন বিক্রয়</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.card, styles.actionCard]} 
-          onPress={() => navigateTo('ProductManagement')}
-        >
-          <Ionicons name="list-outline" size={28} color="#344955" />
-          <Text style={styles.actionText}>পণ্য ব্যবস্থাপনা</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.card, styles.actionCard]} 
-          onPress={() => navigateTo('StockManagement')}
-        >
-          <Ionicons name="refresh-outline" size={28} color="#344955" />
-          <Text style={styles.actionText}>স্টক আপডেট</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.card, styles.actionCard]} 
-          onPress={() => navigateTo('SupplierScreen')}
-        >
-          <Ionicons name="people-outline" size={28} color="#344955" />
-          <Text style={styles.actionText}>সাপ্লাইয়ার</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Low Stock Alerts */}
-      {lowStockCount > 0 && (
-        <>
-          <Text style={styles.sectionTitle}>লো স্টক অ্যালার্ট</Text>
+        <Text style={styles.sectionTitle}>দ্রুত অ্যাকশন</Text>
+        <View style={styles.quickActions}>
           <TouchableOpacity 
-            style={[styles.card, styles.alertCard]}
-            onPress={() => navigateTo('StockManagement')}
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('ProductSelection' as never)}
           >
-            <View style={styles.alertHeader}>
-              <Ionicons name="warning-outline" size={24} color="#E57373" />
-              <Text style={styles.alertTitle}>
-                {lowStockCount} টি পণ্য লো স্টকে রয়েছে
-              </Text>
+            <View style={[styles.actionIconContainer, { backgroundColor: '#e3f2fd' }]}>
+              <MaterialIcons name="shopping-bag" size={24} color="#1976d2" />
             </View>
-            <Text style={styles.alertMessage}>
-              স্টক আপডেট করতে এখানে ক্লিক করুন
-            </Text>
+            <Text style={styles.actionText}>নতুন বিক্রয়</Text>
           </TouchableOpacity>
-        </>
-      )}
-
-      {/* Help Card */}
-      <View style={[styles.card, styles.helpCard]}>
-        <Text style={styles.helpTitle}>সাহায্য প্রয়োজন?</Text>
-        <Text style={styles.helpText}>
-          এপ্লিকেশন ব্যবহারের জন্য মেনু থেকে প্রয়োজনীয় অপশন নির্বাচন করুন। 
-          স্টক আপডেট, পণ্য যোগ, বা বিক্রয় সম্পাদন করতে উপরের আইকনগুলি ব্যবহার করুন।
-        </Text>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('StockManagement' as never)}
+          >
+            <View style={[styles.actionIconContainer, { backgroundColor: '#e8f5e9' }]}>
+              <MaterialIcons name="add-box" size={24} color="#388e3c" />
+            </View>
+            <Text style={styles.actionText}>স্টক যোগ করুন</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('ProductManagement' as never)}
+          >
+            <View style={[styles.actionIconContainer, { backgroundColor: '#fff3e0' }]}>
+              <MaterialIcons name="edit" size={24} color="#f57c00" />
+            </View>
+            <Text style={styles.actionText}>পণ্য ব্যবস্থাপনা</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('Supplier' as never)}
+          >
+            <View style={[styles.actionIconContainer, { backgroundColor: '#f3e5f5' }]}>
+              <Entypo name="users" size={22} color="#7b1fa2" />
+            </View>
+            <Text style={styles.actionText}>সাপ্লায়ার</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('PriceConfig' as never)}
+          >
+            <View style={[styles.actionIconContainer, { backgroundColor: '#e0f7fa' }]}>
+              <MaterialIcons name="price-change" size={24} color="#0097a7" />
+            </View>
+            <Text style={styles.actionText}>মূল্য তালিকা</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
+      <View style={styles.recentTransactionsContainer}>
+        <Text style={styles.sectionTitle}>সাম্প্রতিক বিক্রয়</Text>
+        {recentTransactions.length > 0 ? (
+          recentTransactions.map((transaction, index) => (
+            <View key={transaction.id} style={styles.transactionCard}>
+              <View style={styles.transactionLeft}>
+                <Text style={styles.transactionDate}>{formatDate(transaction.date)}</Text>
+                <Text style={styles.transactionCustomer}>{transaction.customerName}</Text>
+                <Text style={styles.transactionItems}>{transaction.items} টি আইটেম</Text>
+              </View>
+              <View style={styles.transactionRight}>
+                <Text style={styles.transactionAmount}>
+                  {formatCurrency(transaction.total)}
+                </Text>
+              </View>
+            </View>
+          ))
+        ) : (
+          <View style={styles.noTransactionsContainer}>
+            <MaterialIcons name="receipt-long" size={48} color="#bdbdbd" />
+            <Text style={styles.noTransactionsText}>কোন বিক্রয় রেকর্ড নেই</Text>
+          </View>
+        )}
+      </View>
+      
+      <View style={styles.spacer} />
     </ScrollView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
+    backgroundColor: '#f5f5f5',
   },
   header: {
-    padding: 20,
-    backgroundColor: '#344955',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#E0E0E0',
-  },
-  statsContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
-  card: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
   },
-  statCard: {
-    flex: 1,
-    margin: 4,
+  cartIconContainer: {
+    position: 'relative',
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#f44336',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  statValue: {
-    fontSize: 20,
+  cartBadgeText: {
+    color: '#fff',
+    fontSize: 12,
     fontWeight: 'bold',
-    marginVertical: 8,
-    color: '#344955',
+  },
+  welcomeContainer: {
+    padding: 16,
+    backgroundColor: '#2196f3',
+  },
+  welcomeText: {
+    fontSize: 14,
+    color: '#e3f2fd',
+  },
+  businessName: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginTop: 4,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 8,
+    backgroundColor: '#fff',
+    marginBottom: 12,
+  },
+  statCard: {
+    width: '50%',
+    padding: 8,
+  },
+  statIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
   },
   statLabel: {
     fontSize: 14,
-    color: '#4A6572',
+    color: '#757575',
   },
-  alertText: {
-    color: '#E57373',
+  quickActionsContainer: {
+    backgroundColor: '#fff',
+    padding: 16,
+    marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginHorizontal: 16,
-    marginTop: 20,
     marginBottom: 12,
-    color: '#344955',
+    color: '#333',
   },
-  quickActionsContainer: {
+  quickActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 8,
+    justifyContent: 'space-between',
   },
-  actionCard: {
-    width: '46%',
-    marginHorizontal: '2%',
-    marginVertical: 8,
+  actionButton: {
+    width: '30%',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  actionIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 100,
+    marginBottom: 8,
   },
   actionText: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginTop: 8,
-    color: '#344955',
+    fontSize: 12,
+    textAlign: 'center',
+    color: '#333',
   },
-  alertCard: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#E57373',
+  recentTransactionsContainer: {
+    backgroundColor: '#fff',
+    padding: 16,
   },
-  alertHeader: {
+  transactionCard: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
-  alertTitle: {
+  transactionLeft: {
+    flex: 1,
+  },
+  transactionDate: {
+    fontSize: 14,
+    color: '#757575',
+  },
+  transactionCustomer: {
     fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-    color: '#E57373',
+    fontWeight: 'bold',
+    color: '#333',
+    marginVertical: 2,
   },
-  alertMessage: {
+  transactionItems: {
     fontSize: 14,
-    color: '#666',
+    color: '#757575',
   },
-  helpCard: {
-    margin: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#4DB6AC',
-    marginBottom: 30,
+  transactionRight: {
+    justifyContent: 'center',
   },
-  helpTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#4A6572',
+  transactionAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2196f3',
   },
-  helpText: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
+  noTransactionsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  noTransactionsText: {
+    fontSize: 16,
+    color: '#757575',
+    marginTop: 8,
+  },
+  spacer: {
+    height: 20,
   },
 });
+
+export default HomeScreen;

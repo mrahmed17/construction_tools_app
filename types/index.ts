@@ -15,6 +15,25 @@ export type SupplierType = {
   lastPurchase: string;
 };
 
+export type ProductType = {
+  id: string;
+  category: ProductCategory;
+  company?: string;
+  type?: string;
+  color?: string;
+  thickness?: string;
+  size?: string;
+  grade?: string;
+  print?: string;
+  buyPrice: number;
+  sellingPrice: number;
+  stock: number;
+  lowStockThreshold: number;
+  image?: ProductImage;
+  supplier?: string;
+  lastUpdated: string;
+};
+
 export type ProductCategory = 
   | 'টিন' 
   | 'টুয়া' 
