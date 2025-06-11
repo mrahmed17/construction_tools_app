@@ -1,200 +1,364 @@
-export interface User {
+// Product category types
+export type CompanyType = {
   id: string;
   name: string;
-  phone: string;
-  password: string;
-  businessName: string;
-  createdAt: string;
-}
+  productTypes: ProductType[];
+  thicknessOptions: string[];
+  sizeOptions: string[];
+};
 
-export interface Company {
+export type ProductType = {
   id: string;
   name: string;
-  products: string[];
-  thicknesses: number[];
-  sizes: number[];
-}
+  hasColors: boolean;
+  colors?: string[];
+};
 
-export interface Product {
+export type ProductCategory = {
   id: string;
-  category: string;
-  company?: string;
-  type: string;
-  color?: string;
-  thickness?: number;
-  size?: number;
-  purchasePrice: number;
-  salePrice: number;
-  stock: number;
-  minStock: number;
-  unit: 'piece' | 'sheet' | 'foot';
-  image?: string;
-  supplierId?: string;
-}
+  name: string;
+  companies: CompanyType[] | null;
+  hasPrints?: boolean;
+  printTypes?: string[];
+  isCountedByPiece?: boolean;
+  hasThickness: boolean;
+  hasSize: boolean;
+  defaultThicknessOptions?: string[];
+  defaultSizeOptions?: string[];
+};
 
-export interface CartItem {
-  productId: string;
-  product: Product;
-  quantity: number;
-  selectedThickness?: number;
-  selectedSize?: number;
-  selectedColor?: string;
-}
-
-export interface Supplier {
+// Supplier type
+export type Supplier = {
   id: string;
   name: string;
   phone: string;
   address: string;
-  company: string;
-}
+  notes?: string;
+};
 
-export interface Sale {
+// Stock item
+export type StockItem = {
   id: string;
-  customerName: string;
-  customerAddress: string;
-  items: CartItem[];
-  subtotal: number;
-  discount: number;
-  total: number;
-  profit: number;
-  date: string;
-}
+  category: string;
+  company?: string;
+  productType: string;
+  color?: string;
+  size?: string;
+  thickness?: string;
+  currentStock: number;
+  lowStockThreshold: number;
+  purchasePrice: number;
+  sellingPrice: number;
+};
 
-export interface StockMovement {
+// Stock transaction
+export type StockTransaction = {
   id: string;
-  productId: string;
+  itemId: string;
   type: 'in' | 'out';
   quantity: number;
-  reason: string;
-  date: string;
-}
-
-export const CATEGORIES = {
-  tin: {
-    name: 'টিন',
-    companies: ['PHP', 'KY', 'TK (G)', 'ABUL Khair', 'Jalalabad', 'Gelco Steel'],
-    products: ['সুপার', 'লুম', 'কালার'],
-    colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
-    sizes: [6, 7, 8, 9, 10, 11, 12],
-    thicknesses: {
-      'PHP': [0.120, 0.130, 0.140, 0.150, 0.160, 0.170, 0.180, 0.190, 0.200, 0.210, 0.220, 0.230, 0.240, 0.250, 0.260, 0.270, 0.280, 0.290, 0.300, 0.310, 0.320, 0.330, 0.340, 0.350, 0.360, 0.370, 0.380, 0.390, 0.400, 0.410, 0.420, 0.430, 0.440, 0.450, 0.460, 0.470, 0.480, 0.490, 0.500, 0.510],
-      'KY': [0.120, 0.130, 0.140, 0.150, 0.160, 0.170, 0.180, 0.190, 0.200, 0.210, 0.220, 0.230, 0.240, 0.250, 0.260, 0.270, 0.280, 0.290, 0.300, 0.310, 0.320, 0.330, 0.340, 0.350, 0.360, 0.370, 0.380, 0.390, 0.400, 0.410, 0.420, 0.430, 0.440, 0.450, 0.460, 0.470, 0.480, 0.490, 0.500, 0.510],
-      'TK (G)': [0.120, 0.130, 0.140, 0.150, 0.160, 0.170, 0.180, 0.190, 0.200, 0.210, 0.220, 0.230, 0.240, 0.250, 0.260, 0.270, 0.280, 0.290, 0.300, 0.310, 0.320, 0.330, 0.340, 0.350, 0.360, 0.370, 0.380, 0.390, 0.400, 0.410, 0.420, 0.430, 0.440, 0.450, 0.460, 0.470, 0.480, 0.490, 0.500, 0.510],
-      'ABUL Khair': [0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.20, 0.21, 0.22, 0.23, 0.24, 0.25, 0.26, 0.27, 0.28, 0.29, 0.30, 0.31, 0.32, 0.33, 0.34, 0.35, 0.36, 0.37, 0.38, 0.39, 0.40, 0.41, 0.42, 0.43, 0.44, 0.45, 0.46],
-      'Jalalabad': [0.25, 0.35, 0.38, 0.42, 0.46, 0.48, 0.52, 0.54, 0.58, 0.62, 0.64, 0.72],
-      'Gelco Steel': [0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.20, 0.21, 0.22, 0.23, 0.24, 0.25, 0.26, 0.27, 0.28, 0.29, 0.30, 0.31, 0.32, 0.33, 0.34, 0.35, 0.36, 0.37, 0.38, 0.39, 0.40, 0.41, 0.42, 0.43, 0.44, 0.45, 0.46]
-    }
-  },
-  tua: {
-    name: 'টুয়া',
-    companies: ['PHP', 'KY', 'TK (G)', 'ABUL Khair', 'Jalalabad', 'Gelco Steel'],
-    products: ['সুপার', 'লুম', 'কালার'],
-    colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
-    sizes: [6, 7, 8, 9, 10],
-    thicknesses: {
-      'PHP': [0.120, 0.130, 0.140, 0.150, 0.160, 0.170, 0.180, 0.190, 0.200, 0.210, 0.220, 0.230, 0.240, 0.250, 0.260, 0.270, 0.280, 0.290, 0.300, 0.310, 0.320, 0.330, 0.340, 0.350, 0.360, 0.370, 0.380, 0.390, 0.400, 0.410, 0.420, 0.430, 0.440, 0.450, 0.460, 0.470, 0.480, 0.490, 0.500, 0.510],
-      'KY': [0.120, 0.130, 0.140, 0.150, 0.160, 0.170, 0.180, 0.190, 0.200, 0.210, 0.220, 0.230, 0.240, 0.250, 0.260, 0.270, 0.280, 0.290, 0.300, 0.310, 0.320, 0.330, 0.340, 0.350, 0.360, 0.370, 0.380, 0.390, 0.400, 0.410, 0.420, 0.430, 0.440, 0.450, 0.460, 0.470, 0.480, 0.490, 0.500, 0.510],
-      'TK (G)': [0.120, 0.130, 0.140, 0.150, 0.160, 0.170, 0.180, 0.190, 0.200, 0.210, 0.220, 0.230, 0.240, 0.250, 0.260, 0.270, 0.280, 0.290, 0.300, 0.310, 0.320, 0.330, 0.340, 0.350, 0.360, 0.370, 0.380, 0.390, 0.400, 0.410, 0.420, 0.430, 0.440, 0.450, 0.460, 0.470, 0.480, 0.490, 0.500, 0.510],
-      'ABUL Khair': [0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.20, 0.21, 0.22, 0.23, 0.24, 0.25, 0.26, 0.27, 0.28, 0.29, 0.30, 0.31, 0.32, 0.33, 0.34, 0.35, 0.36, 0.37, 0.38, 0.39, 0.40, 0.41, 0.42, 0.43, 0.44, 0.45, 0.46],
-      'Jalalabad': [0.25, 0.35, 0.38, 0.42, 0.46, 0.48, 0.52, 0.54, 0.58, 0.62, 0.64, 0.72],
-      'Gelco Steel': [0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.20, 0.21, 0.22, 0.23, 0.24, 0.25, 0.26, 0.27, 0.28, 0.29, 0.30, 0.31, 0.32, 0.33, 0.34, 0.35, 0.36, 0.37, 0.38, 0.39, 0.40, 0.41, 0.42, 0.43, 0.44, 0.45, 0.46]
-    }
-  },
-  plainSheet: {
-    name: 'প্লেইন শিট',
-    companies: ['PHP', 'KY', 'TK (G)', 'ABUL Khair', 'Jalalabad', 'Gelco Steel'],
-    products: ['সুপার', 'লুম', 'কালার'],
-    colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
-    sizes: [6, 7, 8, 9, 10],
-    thicknesses: {
-      'PHP': [0.120, 0.130, 0.140, 0.150, 0.160, 0.170, 0.180, 0.190, 0.200, 0.210, 0.220, 0.230, 0.240, 0.250, 0.260, 0.270, 0.280, 0.290, 0.300, 0.310, 0.320, 0.330, 0.340, 0.350, 0.360, 0.370, 0.380, 0.390, 0.400, 0.410, 0.420, 0.430, 0.440, 0.450, 0.460, 0.470, 0.480, 0.490, 0.500, 0.510],
-      'KY': [0.120, 0.130, 0.140, 0.150, 0.160, 0.170, 0.180, 0.190, 0.200, 0.210, 0.220, 0.230, 0.240, 0.250, 0.260, 0.270, 0.280, 0.290, 0.300, 0.310, 0.320, 0.330, 0.340, 0.350, 0.360, 0.370, 0.380, 0.390, 0.400, 0.410, 0.420, 0.430, 0.440, 0.450, 0.460, 0.470, 0.480, 0.490, 0.500, 0.510],
-      'TK (G)': [0.120, 0.130, 0.140, 0.150, 0.160, 0.170, 0.180, 0.190, 0.200, 0.210, 0.220, 0.230, 0.240, 0.250, 0.260, 0.270, 0.280, 0.290, 0.300, 0.310, 0.320, 0.330, 0.340, 0.350, 0.360, 0.370, 0.380, 0.390, 0.400, 0.410, 0.420, 0.430, 0.440, 0.450, 0.460, 0.470, 0.480, 0.490, 0.500, 0.510],
-      'ABUL Khair': [0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.20, 0.21, 0.22, 0.23, 0.24, 0.25, 0.26, 0.27, 0.28, 0.29, 0.30, 0.31, 0.32, 0.33, 0.34, 0.35, 0.36, 0.37, 0.38, 0.39, 0.40, 0.41, 0.42, 0.43, 0.44, 0.45, 0.46],
-      'Jalalabad': [0.25, 0.35, 0.38, 0.42, 0.46, 0.48, 0.52, 0.54, 0.58, 0.62, 0.64, 0.72],
-      'Gelco Steel': [0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.20, 0.21, 0.22, 0.23, 0.24, 0.25, 0.26, 0.27, 0.28, 0.29, 0.30, 0.31, 0.32, 0.33, 0.34, 0.35, 0.36, 0.37, 0.38, 0.39, 0.40, 0.41, 0.42, 0.43, 0.44, 0.45, 0.46]
-    }
-  },
-  flowerSheet: {
-    name: 'ফুলের শিট',
-    companies: [],
-    products: ['প্রিন্ট শিট'],
-    colors: [],
-    sizes: [6, 7, 8, 9, 10],
-    thicknesses: {}
-  },
-  plasticTin: {
-    name: 'প্লাস্টিকের টিন',
-    companies: ['RFL'],
-    products: ['স্ট্যান্ডার্ড'],
-    colors: [],
-    sizes: [6, 7, 8, 9, 10, 11, 12],
-    thicknesses: {
-      'RFL': [0.75, 1.00, 1.25, 1.50, 1.75]
-    }
-  },
-  corrugated: {
-    name: 'ফুলের ঢেউটিন',
-    companies: ['PHP'],
-    products: ['সুপার', 'লুম', 'কালার'],
-    colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
-    sizes: [6, 7, 8, 9, 10, 11, 12],
-    thicknesses: {
-      'PHP': [0.120, 0.130, 0.140, 0.150, 0.160, 0.170, 0.180, 0.190, 0.200, 0.210, 0.220, 0.230, 0.240, 0.250, 0.260, 0.270, 0.280, 0.290, 0.300, 0.310, 0.320, 0.330, 0.340, 0.350, 0.360, 0.370, 0.380, 0.390, 0.400, 0.410, 0.420, 0.430, 0.440, 0.450, 0.460, 0.470, 0.480, 0.490, 0.500, 0.510]
-    }
-  },
-  roofingPlastic: {
-    name: 'চাচের প্লাস্টিক (সেলু লাইট)',
-    companies: [],
-    products: ['স্ট্যান্ডার্ড'],
-    colors: [],
-    sizes: [6, 7, 8, 9, 10, 11, 12],
-    thicknesses: {}
-  },
-  digitalRoof: {
-    name: 'চাচ ডিজিটাল',
-    companies: [],
-    products: ['ডিজিটাল'],
-    colors: [],
-    sizes: [],
-    thicknesses: {},
-    unit: 'piece'
-  },
-  deepRoof: {
-    name: 'ডিপ চাচ',
-    companies: [],
-    products: ['ডিপ'],
-    colors: [],
-    sizes: [],
-    thicknesses: {},
-    unit: 'piece'
-  },
-  coil: {
-    name: 'কয়েল (পি-ফোম)',
-    companies: [],
-    products: ['কয়েল'],
-    colors: [],
-    sizes: [],
-    thicknesses: {
-      'default': [4, 5, 6, 7, 8, 9, 10, 11, 12]
-    }
-  },
-  aluminum: {
-    name: 'অ্যালুমিনিয়াম',
-    companies: [],
-    products: ['এ-গ্রেড', 'বি-গ্রেড'],
-    colors: [],
-    sizes: [],
-    thicknesses: {}
-  },
-  scrap: {
-    name: 'ঝালট',
-    companies: [],
-    products: ['ঝালট'],
-    colors: [],
-    sizes: [],
-    thicknesses: {},
-    unit: 'piece'
-  }
+  date: Date;
+  supplierId?: string;
+  notes?: string;
 };
+
+// Customer
+export type Customer = {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
+};
+
+// Invoice
+export type Invoice = {
+  id: string;
+  customerId?: string;
+  customerName: string;
+  customerPhone?: string;
+  customerAddress?: string;
+  items: {
+    id: string;
+    category: string;
+    company?: string;
+    productType: string;
+    color?: string;
+    size?: string;
+    thickness?: string;
+    quantity: number;
+    purchasePrice: number;
+    sellingPrice: number;
+    profit: number;
+  }[];
+  totalAmount: number;
+  discount: number;
+  finalAmount: number;
+  totalProfit: number;
+  date: Date;
+  paidAmount: number;
+  dueAmount: number;
+  notes?: string;
+};
+
+// Mock data for product categories
+export const PRODUCT_CATEGORIES: ProductCategory[] = [
+  {
+    id: 'tin',
+    name: 'টিন',
+    hasThickness: true,
+    hasSize: true,
+    defaultSizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট'],
+    companies: [
+      {
+        id: 'php',
+        name: 'PHP',
+        productTypes: [
+          { id: 'super', name: 'সুপার', hasColors: false },
+          { id: 'lum', name: 'লুম', hasColors: false },
+          { 
+            id: 'color', 
+            name: 'কালার', 
+            hasColors: true, 
+            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু কালার', 'রেড'] 
+          }
+        ],
+        thicknessOptions: [
+          '০.১২০', '০.১৩০', '০.১৪০', '০.১৫০', '০.১৬০', '০.১৭০', '০.১৮০', '০.১৯০', 
+          '০.২০০', '০.২১০', '০.২২০', '০.২৩০', '০.২৪০', '০.২৫০', '০.২৬০', '০.২৭০',
+          '০.২৮০', '০.২৯০', '০.৩০০', '০.৩১০', '০.৩২০', '০.৩৩০', '০.৩৪০', '০.৩৫০',
+          '০.৩৬০', '০.৩৭০', '০.৩৮০', '০.৩৯০', '০.৪০০', '০.৪১০', '০.৪২০', '০.৪৩০',
+          '০.৪৪০', '০.৪৫০', '০.৪৬০', '০.৪৭০', '০.৪৮০', '০.৪৯০', '০.৫০০', '০.৫১০'
+        ],
+        sizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট']
+      },
+      {
+        id: 'ky',
+        name: 'KY',
+        productTypes: [
+          { id: 'nof', name: 'NOF', hasColors: false },
+          { id: 'lum', name: 'লুম', hasColors: false },
+          { 
+            id: 'color', 
+            name: 'কালার', 
+            hasColors: true, 
+            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু কালার', 'রেড'] 
+          }
+        ],
+        thicknessOptions: [
+          '০.১২০', '০.১৩০', '০.১৪০', '০.১৫০', '০.১৬০', '০.১৭০', '০.১৮০', '০.১৯০', 
+          '০.২০০', '০.২১০', '০.২২০', '০.২৩০', '০.২৪০', '০.২৫০', '০.২৬০', '০.২৭০',
+          '০.২৮০', '০.২৯০', '০.৩০০', '০.৩১০', '০.৩২০', '০.৩৩০', '০.৩৪০', '০.৩৫০',
+          '০.৩৬০', '০.৩৭০', '০.৩৮০', '০.৩৯০', '০.৪০০', '০.৪১০', '০.৪২০', '০.৪৩০',
+          '০.৪৪০', '০.৪৫০', '০.৪৬০', '০.৪৭০', '০.৪৮০', '০.৪৯০', '০.৫০০', '০.৫১০'
+        ],
+        sizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট']
+      },
+      {
+        id: 'tkg',
+        name: 'TK(G)',
+        productTypes: [
+          { id: 'standard', name: 'স্ট্যান্ডার্ড', hasColors: false }
+        ],
+        thicknessOptions: [
+          '০.১২০', '০.১৩০', '০.১৪০', '০.১৫০', '০.১৬০', '০.১৭০', '০.১৮০', '০.১৯০', 
+          '০.২০০', '০.২১০', '০.২২০', '০.২৩০', '০.২৪০', '০.২৫০', '০.২৬০', '০.২৭০',
+          '০.২৮০', '০.২৯০', '০.৩০০', '০.৩১০', '০.৩২০', '০.৩৩০', '০.৩৪০', '০.৩৫০',
+          '০.৩৬০', '০.৩৭০', '০.৩৮০', '০.৩৯০', '০.৪০০', '০.৪১০', '০.৪২০', '০.৪৩০',
+          '০.৪৪০', '০.৪৫০', '০.৪৬০', '০.৪৭০', '০.৪৮০', '০.৪৯০', '০.৫০০', '০.৫১০'
+        ],
+        sizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট']
+      },
+      {
+        id: 'abulkhair',
+        name: 'ABUL Khair',
+        productTypes: [
+          { id: 'standard', name: 'স্ট্যান্ডার্ড', hasColors: false }
+        ],
+        thicknessOptions: [
+          '০.১২০', '০.১৩০', '০.১৪০', '০.১৫০', '০.১৬০', '০.১৭০', '০.১৮০', '০.১৯০', 
+          '০.২০০', '০.২১০', '০.২২০', '০.২৩০', '০.২৪০', '০.২৫০', '০.২৬০', '০.২৭০',
+          '০.২৮০', '০.২৯০', '০.৩০০', '০.৩১০', '০.৩২০', '০.৩৩০', '০.৩৪০', '০.৩৫০',
+          '০.৩৬০', '০.৩৭০', '০.৩৮০', '০.৩৯০', '০.৪০০', '০.৪১০', '০.৪২০', '০.৪৩০',
+          '০.৪৪০', '০.৪৫০', '০.৪৬০'
+        ],
+        sizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট']
+      },
+      {
+        id: 'jalalabad',
+        name: 'Jalalabad',
+        productTypes: [
+          { id: 'standard', name: 'স্ট্যান্ডার্ড', hasColors: false }
+        ],
+        thicknessOptions: [
+          '০.২৫', '০.৩৫', '০.৩৮', '০.৪২', '০.৪৬', '০.৪৮', 
+          '০.৫২', '০.৫৪', '০.৫৮', '০.৬২', '০.৬৪', '০.৭২'
+        ],
+        sizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট']
+      },
+      {
+        id: 'gelcosteel',
+        name: 'Gelco Steel',
+        productTypes: [
+          { id: 'standard', name: 'স্ট্যান্ডার্ড', hasColors: false }
+        ],
+        thicknessOptions: [
+          '০.১২০', '০.১৩০', '০.১৪০', '০.১৫০', '০.১৬০', '০.১৭০', '০.১৮০', '০.১৯০', 
+          '০.২০০', '০.২১০', '০.২২০', '০.২৩০', '০.২৪০', '০.২৫০', '০.২৬০', '০.২৭০',
+          '০.২৮০', '০.২৯০', '০.৩০০', '০.৩১০', '০.৩২০', '০.৩৩০', '০.৩৪০', '০.৩৫০',
+          '০.৩৬০', '০.৩৭০', '০.৩৮০', '০.৩৯০', '০.৪০০', '০.৪১০', '০.৪২০', '০.৪৩০',
+          '০.৪৪০', '০.৪৫০', '০.৪৬০'
+        ],
+        sizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট']
+      }
+    ],
+  },
+  {
+    id: 'tuya',
+    name: 'টুয়া',
+    hasThickness: true,
+    hasSize: true,
+    defaultSizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট'],
+    companies: [
+      {
+        id: 'php',
+        name: 'PHP',
+        productTypes: [
+          { id: 'super', name: 'সুপার', hasColors: false },
+          { id: 'lum', name: 'লুম', hasColors: false },
+          { 
+            id: 'color', 
+            name: 'কালার', 
+            hasColors: true, 
+            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু কালার', 'রেড'] 
+          }
+        ],
+        thicknessOptions: [
+          '০.১২০', '০.১৩০', '০.১৪০', '০.১৫০', '০.১৬০', '০.১৭০', '০.১৮০', '০.১৯০', 
+          '০.২০০', '০.২১০', '০.২২০', '০.২৩০', '০.২৪০', '০.২৫০', '০.২৬০', '০.২৭০',
+          '০.২৮০', '০.২৯০', '০.৩০০', '০.৩১০', '০.৩২০', '০.৩৩০', '০.৩৪০', '০.৩৫০',
+          '০.৩৬০', '০.৩৭০', '০.৩৮০', '০.৩৯০', '০.৪০০', '০.৪১০', '০.৪২০', '০.৪৩০',
+          '০.৪৪০', '০.৪৫০', '০.৪৬০', '০.৪৭০', '০.৪৮০', '০.৪৯০', '০.৫০০', '০.৫১০'
+        ],
+        sizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট']
+      },
+      // Similar structure for other companies
+    ],
+  },
+  {
+    id: 'plainsheet',
+    name: 'প্লেইন শিট',
+    hasThickness: true,
+    hasSize: true,
+    defaultSizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট'],
+    companies: [
+      // Same as Tuya
+    ],
+  },
+  {
+    id: 'flowersheet',
+    name: 'ফুলের শিট',
+    hasThickness: true,
+    hasSize: true,
+    defaultSizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট'],
+    hasPrints: true,
+    printTypes: ['টাইপ ১', 'টাইপ ২', 'টাইপ ৩'],
+    companies: null,
+  },
+  {
+    id: 'plastictinsheet',
+    name: 'প্লাস্টিকের টিন',
+    hasThickness: true,
+    hasSize: true,
+    defaultSizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট'],
+    companies: [
+      {
+        id: 'rfl',
+        name: 'RFL',
+        productTypes: [
+          { id: 'standard', name: 'স্ট্যান্ডার্ড', hasColors: false }
+        ],
+        thicknessOptions: [
+          '০.৭৫', '১.০০', '১.২৫', '১.৫০', '১.৭৫'
+        ],
+        sizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট']
+      }
+    ],
+  },
+  {
+    id: 'flowerdeutin',
+    name: 'ফুলের ঢেউটিন',
+    hasThickness: true,
+    hasSize: true,
+    defaultSizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট'],
+    companies: [
+      {
+        id: 'php',
+        name: 'PHP',
+        productTypes: [
+          { id: 'standard', name: 'স্ট্যান্ডার্ড', hasColors: false }
+        ],
+        thicknessOptions: [
+          '০.১২০', '০.১৩০', '০.১৪০', '০.১৫০', '০.১৬০', '০.১৭০', '০.১৮০', '০.১৯০', 
+          '০.২০০', '০.২১০', '০.২২০', '০.২৩০', '০.২৪০', '০.২৫০', '০.২৬০', '০.২৭০',
+          '০.২৮০', '০.২৯০', '০.৩০০', '০.৩১০', '০.৩২০', '০.৩৩০', '০.৩৪০', '০.৩৫০',
+          '০.৩৬০', '০.৩৭০', '০.৩৮০', '০.৩৯০', '০.৪০০', '০.৪১০', '০.৪২০', '০.৪৩০',
+          '০.৪৪০', '০.৪৫০', '০.৪৬০', '০.৪৭০', '০.৪৮০', '০.৪৯০', '০.৫০০', '০.৫১০'
+        ],
+        sizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট']
+      }
+    ],
+  },
+  {
+    id: 'chachplastic',
+    name: 'চাচের প্লাস্টিক (সেলু লাইট)',
+    hasThickness: true,
+    hasSize: true,
+    defaultSizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট'],
+    companies: null,
+  },
+  {
+    id: 'chachdigital',
+    name: 'চাচ ডিজিটাল',
+    hasThickness: false,
+    hasSize: false,
+    isCountedByPiece: true,
+    companies: null,
+  },
+  {
+    id: 'deepchach',
+    name: 'ডিপ চাচ',
+    hasThickness: false,
+    hasSize: false,
+    isCountedByPiece: true,
+    companies: null,
+  },
+  {
+    id: 'coil',
+    name: 'কয়েল (পি-ফোম)',
+    hasThickness: true,
+    hasSize: false,
+    companies: null,
+    defaultThicknessOptions: [
+      '৪', '৫', '৬', '৭', '৮', '৯', '১০', '১১', '১২'
+    ]
+  },
+  {
+    id: 'aluminum',
+    name: 'অ্যালুমিনিয়াম',
+    hasThickness: false,
+    hasSize: false,
+    companies: null,
+    productTypes: [
+      { id: 'a-grade', name: 'এ-গ্রেড', hasColors: false },
+      { id: 'b-grade', name: 'বি-গ্রেড', hasColors: false }
+    ]
+  },
+  {
+    id: 'jhalat',
+    name: 'ঝালট',
+    hasThickness: false,
+    hasSize: false,
+    isCountedByPiece: true,
+    companies: null,
+  }
+];
