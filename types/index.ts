@@ -1,364 +1,358 @@
 // Product category types
-export type CompanyType = {
+export interface ProductType {
   id: string;
   name: string;
-  productTypes: ProductType[];
-  thicknessOptions: string[];
-  sizeOptions: string[];
-};
-
-export type ProductType = {
-  id: string;
-  name: string;
-  hasColors: boolean;
-  colors?: string[];
-};
-
-export type ProductCategory = {
-  id: string;
-  name: string;
-  companies: CompanyType[] | null;
-  hasPrints?: boolean;
-  printTypes?: string[];
-  isCountedByPiece?: boolean;
-  hasThickness: boolean;
-  hasSize: boolean;
-  defaultThicknessOptions?: string[];
-  defaultSizeOptions?: string[];
-};
-
-// Supplier type
-export type Supplier = {
-  id: string;
-  name: string;
-  phone: string;
-  address: string;
-  notes?: string;
-};
-
-// Stock item
-export type StockItem = {
-  id: string;
   category: string;
-  company?: string;
-  productType: string;
+  subCategory?: string;
+  companyName?: string;
+  productType?: string;
   color?: string;
-  size?: string;
   thickness?: string;
-  currentStock: number;
+  size?: string;
+  buyPrice: number;
+  sellPrice: number;
+  stock: number;
   lowStockThreshold: number;
-  purchasePrice: number;
-  sellingPrice: number;
-};
-
-// Stock transaction
-export type StockTransaction = {
-  id: string;
-  itemId: string;
-  type: 'in' | 'out';
-  quantity: number;
-  date: Date;
+  imageUri?: string;
+  unit: 'pieces' | 'feet' | 'meter';
+  createdAt: number;
   supplierId?: string;
-  notes?: string;
-};
+}
 
-// Customer
-export type Customer = {
+export interface SupplierType {
   id: string;
   name: string;
   phone: string;
   address: string;
-};
+  email?: string;
+  unpaidAmount: number;
+  lastPurchaseDate?: number;
+  notes?: string;
+}
 
-// Invoice
-export type Invoice = {
+export interface CartItemType {
+  product: ProductType;
+  quantity: number;
+}
+
+export interface SaleType {
   id: string;
   customerId?: string;
   customerName: string;
   customerPhone?: string;
   customerAddress?: string;
-  items: {
-    id: string;
-    category: string;
-    company?: string;
-    productType: string;
-    color?: string;
-    size?: string;
-    thickness?: string;
-    quantity: number;
-    purchasePrice: number;
-    sellingPrice: number;
-    profit: number;
-  }[];
+  items: CartItemType[];
   totalAmount: number;
   discount: number;
-  finalAmount: number;
-  totalProfit: number;
-  date: Date;
-  paidAmount: number;
-  dueAmount: number;
-  notes?: string;
-};
+  amountPaid: number;
+  amountDue: number;
+  saleDate: number;
+  createdBy: string;
+}
 
-// Mock data for product categories
-export const PRODUCT_CATEGORIES: ProductCategory[] = [
+// Product category structure
+export interface CategoryStructure {
+  id: string;
+  name: string;
+  companies?: Company[];
+}
+
+export interface Company {
+  id: string;
+  name: string;
+  productTypes: ProductVariant[];
+}
+
+export interface ProductVariant {
+  id: string;
+  name: string;
+  colors?: string[];
+  thicknesses?: string[];
+  sizes?: string[];
+}
+
+// Define all our product categories
+export const PRODUCT_CATEGORIES: CategoryStructure[] = [
   {
     id: 'tin',
     name: 'টিন',
-    hasThickness: true,
-    hasSize: true,
-    defaultSizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট'],
     companies: [
       {
         id: 'php',
         name: 'PHP',
         productTypes: [
-          { id: 'super', name: 'সুপার', hasColors: false },
-          { id: 'lum', name: 'লুম', hasColors: false },
+          { id: 'super', name: 'সুপার', thicknesses: generateThicknesses(0.120, 0.510, 0.010) },
+          { id: 'loom', name: 'লুম', thicknesses: generateThicknesses(0.120, 0.510, 0.010) },
           { 
             id: 'color', 
-            name: 'কালার', 
-            hasColors: true, 
-            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু কালার', 'রেড'] 
+            name: 'কালার',
+            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
+            thicknesses: generateThicknesses(0.120, 0.510, 0.010)
           }
-        ],
-        thicknessOptions: [
-          '০.১২০', '০.১৩০', '০.১৪০', '০.১৫০', '০.১৬০', '০.১৭০', '০.১৮০', '০.১৯০', 
-          '০.২০০', '০.২১০', '০.২২০', '০.২৩০', '০.২৪০', '০.২৫০', '০.২৬০', '০.২৭০',
-          '০.২৮০', '০.২৯০', '০.৩০০', '০.৩১০', '০.৩২০', '০.৩৩০', '০.৩৪০', '০.৩৫০',
-          '০.৩৬০', '০.৩৭০', '০.৩৮০', '০.৩৯০', '০.৪০০', '০.৪১০', '০.৪২০', '০.৪৩০',
-          '০.৪৪০', '০.৪৫০', '০.৪৬০', '০.৪৭০', '০.৪৮০', '০.৪৯০', '০.৫০০', '০.৫১০'
-        ],
-        sizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট']
+        ]
       },
       {
         id: 'ky',
         name: 'KY',
         productTypes: [
-          { id: 'nof', name: 'NOF', hasColors: false },
-          { id: 'lum', name: 'লুম', hasColors: false },
+          { id: 'nof', name: 'NOF', thicknesses: generateThicknesses(0.120, 0.510, 0.010) },
+          { id: 'loom', name: 'লুম', thicknesses: generateThicknesses(0.120, 0.510, 0.010) },
           { 
             id: 'color', 
-            name: 'কালার', 
-            hasColors: true, 
-            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু কালার', 'রেড'] 
+            name: 'কালার',
+            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
+            thicknesses: generateThicknesses(0.120, 0.510, 0.010)
           }
-        ],
-        thicknessOptions: [
-          '০.১২০', '০.১৩০', '০.১৪০', '০.১৫০', '০.১৬০', '০.১৭০', '০.১৮০', '০.১৯০', 
-          '০.২০০', '০.২১০', '০.২২০', '০.২৩০', '০.২৪০', '০.২৫০', '০.২৬০', '০.২৭০',
-          '০.২৮০', '০.২৯০', '০.৩০০', '০.৩১০', '০.৩২০', '০.৩৩০', '০.৩৪০', '০.৩৫০',
-          '০.৩৬০', '০.৩৭০', '০.৩৮০', '০.৩৯০', '০.৪০০', '০.৪১০', '০.৪২০', '০.৪৩০',
-          '০.৪৪০', '০.৪৫০', '০.৪৬০', '০.৪৭০', '০.৪৮০', '০.৪৯০', '০.৫০০', '০.৫১০'
-        ],
-        sizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট']
+        ]
       },
       {
         id: 'tkg',
-        name: 'TK(G)',
+        name: 'TK (G)',
         productTypes: [
-          { id: 'standard', name: 'স্ট্যান্ডার্ড', hasColors: false }
-        ],
-        thicknessOptions: [
-          '০.১২০', '০.১৩০', '০.১৪০', '০.১৫০', '০.১৬০', '০.১৭০', '০.১৮০', '০.১৯০', 
-          '০.২০০', '০.২১০', '০.২২০', '০.২৩০', '০.২৪০', '০.২৫০', '০.২৬০', '০.২৭০',
-          '০.২৮০', '০.২৯০', '০.৩০০', '০.৩১০', '০.৩২০', '০.৩৩০', '০.৩৪০', '০.৩৫০',
-          '০.৩৬০', '০.৩৭০', '০.৩৮০', '০.৩৯০', '০.৪০০', '০.৪১০', '০.৪২০', '০.৪৩০',
-          '০.৪৪০', '০.৪৫০', '০.৪৬০', '০.৪৭০', '০.৪৮০', '০.৪৯০', '০.৫০০', '০.৫১০'
-        ],
-        sizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট']
+          { id: 'super', name: 'সুপার', thicknesses: generateThicknesses(0.120, 0.510, 0.010) },
+          { id: 'loom', name: 'লুম', thicknesses: generateThicknesses(0.120, 0.510, 0.010) },
+          { 
+            id: 'color', 
+            name: 'কালার',
+            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
+            thicknesses: generateThicknesses(0.120, 0.510, 0.010)
+          }
+        ]
       },
       {
         id: 'abulkhair',
         name: 'ABUL Khair',
         productTypes: [
-          { id: 'standard', name: 'স্ট্যান্ডার্ড', hasColors: false }
-        ],
-        thicknessOptions: [
-          '০.১২০', '০.১৩০', '০.১৪০', '০.১৫০', '০.১৬০', '০.১৭০', '০.১৮০', '০.১৯০', 
-          '০.২০০', '০.২১০', '০.২২০', '০.২৩০', '০.২৪০', '০.২৫০', '০.২৬০', '০.২৭০',
-          '০.২৮০', '০.২৯০', '০.৩০০', '০.৩১০', '০.৩২০', '০.৩৩০', '০.৩৪০', '০.৩৫০',
-          '০.৩৬০', '০.৩৭০', '০.৩৮০', '০.৩৯০', '০.৪০০', '০.৪১০', '০.৪২০', '০.৪৩০',
-          '০.৪৪০', '০.৪৫০', '০.৪৬০'
-        ],
-        sizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট']
+          { id: 'super', name: 'সুপার', thicknesses: generateThicknesses(0.120, 0.460, 0.010) },
+          { id: 'loom', name: 'লুম', thicknesses: generateThicknesses(0.120, 0.460, 0.010) },
+          { 
+            id: 'color', 
+            name: 'কালার',
+            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
+            thicknesses: generateThicknesses(0.120, 0.460, 0.010)
+          }
+        ]
       },
       {
         id: 'jalalabad',
         name: 'Jalalabad',
         productTypes: [
-          { id: 'standard', name: 'স্ট্যান্ডার্ড', hasColors: false }
-        ],
-        thicknessOptions: [
-          '০.২৫', '০.৩৫', '০.৩৮', '০.৪২', '০.৪৬', '০.৪৮', 
-          '০.৫২', '০.৫৪', '০.৫৮', '০.৬২', '০.৬৪', '০.৭২'
-        ],
-        sizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট']
+          { 
+            id: 'super', 
+            name: 'সুপার', 
+            thicknesses: ['0.25', '0.35', '0.38', '0.42', '0.46', '0.48', '0.52', '0.54', '0.58', '0.62', '0.64', '0.72']
+          },
+          { 
+            id: 'loom', 
+            name: 'লুম', 
+            thicknesses: ['0.25', '0.35', '0.38', '0.42', '0.46', '0.48', '0.52', '0.54', '0.58', '0.62', '0.64', '0.72'] 
+          },
+          { 
+            id: 'color', 
+            name: 'কালার',
+            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
+            thicknesses: ['0.25', '0.35', '0.38', '0.42', '0.46', '0.48', '0.52', '0.54', '0.58', '0.62', '0.64', '0.72']
+          }
+        ]
       },
       {
         id: 'gelcosteel',
         name: 'Gelco Steel',
         productTypes: [
-          { id: 'standard', name: 'স্ট্যান্ডার্ড', hasColors: false }
-        ],
-        thicknessOptions: [
-          '০.১২০', '০.১৩০', '০.১৪০', '০.১৫০', '০.১৬০', '০.১৭০', '০.১৮০', '০.১৯০', 
-          '০.২০০', '০.২১০', '০.২২০', '০.২৩০', '০.২৪০', '০.২৫০', '০.২৬০', '০.২৭০',
-          '০.২৮০', '০.২৯০', '০.৩০০', '০.৩১০', '০.৩২০', '০.৩৩০', '০.৩৪০', '০.৩৫০',
-          '০.৩৬০', '০.৩৭০', '০.৩৮০', '০.৩৯০', '০.৪০০', '০.৪১০', '০.৪২০', '০.৪৩০',
-          '০.৪৪০', '০.৪৫০', '০.৪৬০'
-        ],
-        sizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট']
+          { id: 'super', name: 'সুপার', thicknesses: generateThicknesses(0.120, 0.460, 0.010) },
+          { id: 'loom', name: 'লুম', thicknesses: generateThicknesses(0.120, 0.460, 0.010) },
+          { 
+            id: 'color', 
+            name: 'কালার',
+            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
+            thicknesses: generateThicknesses(0.120, 0.460, 0.010)
+          }
+        ]
       }
-    ],
+    ]
   },
   {
     id: 'tuya',
     name: 'টুয়া',
-    hasThickness: true,
-    hasSize: true,
-    defaultSizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট'],
     companies: [
       {
         id: 'php',
         name: 'PHP',
         productTypes: [
-          { id: 'super', name: 'সুপার', hasColors: false },
-          { id: 'lum', name: 'লুম', hasColors: false },
+          { id: 'super', name: 'সুপার', thicknesses: generateThicknesses(0.120, 0.510, 0.010) },
+          { id: 'loom', name: 'লুম', thicknesses: generateThicknesses(0.120, 0.510, 0.010) },
           { 
             id: 'color', 
-            name: 'কালার', 
-            hasColors: true, 
-            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু কালার', 'রেড'] 
+            name: 'কালার',
+            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
+            thicknesses: generateThicknesses(0.120, 0.510, 0.010)
           }
-        ],
-        thicknessOptions: [
-          '০.১২০', '০.১৩০', '০.১৪০', '০.১৫০', '০.১৬০', '০.১৭০', '০.১৮০', '০.১৯০', 
-          '০.২০০', '০.২১০', '০.২২০', '০.২৩০', '০.২৪০', '০.২৫০', '০.২৬০', '০.২৭০',
-          '০.২৮০', '০.২৯০', '০.৩০০', '০.৩১০', '০.৩২০', '০.৩৩০', '০.৩৪০', '০.৩৫০',
-          '০.৩৬০', '০.৩৭০', '০.৩৮০', '০.৩৯০', '০.৪০০', '০.৪১০', '০.৪২০', '০.৪৩০',
-          '০.৪৪০', '০.৪৫০', '০.৪৬০', '০.৪৭০', '০.৪৮০', '০.৪৯০', '০.৫০০', '০.৫১০'
-        ],
-        sizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট']
+        ]
       },
-      // Similar structure for other companies
-    ],
+      // Other companies similar to Tin but with different size range (6-10 feet)
+    ]
   },
   {
     id: 'plainsheet',
     name: 'প্লেইন শিট',
-    hasThickness: true,
-    hasSize: true,
-    defaultSizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট'],
-    companies: [
-      // Same as Tuya
-    ],
+    // Same structure as tuya
   },
   {
     id: 'flowersheet',
     name: 'ফুলের শিট',
-    hasThickness: true,
-    hasSize: true,
-    defaultSizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট'],
-    hasPrints: true,
-    printTypes: ['টাইপ ১', 'টাইপ ২', 'টাইপ ৩'],
-    companies: null,
+    // No companies, but has print types instead
+    companies: [
+      {
+        id: 'print',
+        name: 'প্রিন্ট টাইপ',
+        productTypes: [
+          { id: 'flower1', name: 'ফুল প্যাটার্ন ১' },
+          { id: 'flower2', name: 'ফুল প্যাটার্ন ২' },
+          { id: 'flower3', name: 'ফুল প্যাটার্ন ৩' }
+        ]
+      }
+    ]
   },
   {
-    id: 'plastictinsheet',
+    id: 'plastictin',
     name: 'প্লাস্টিকের টিন',
-    hasThickness: true,
-    hasSize: true,
-    defaultSizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট'],
     companies: [
       {
         id: 'rfl',
         name: 'RFL',
         productTypes: [
-          { id: 'standard', name: 'স্ট্যান্ডার্ড', hasColors: false }
-        ],
-        thicknessOptions: [
-          '০.৭৫', '১.০০', '১.২৫', '১.৫০', '১.৭৫'
-        ],
-        sizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট']
+          { 
+            id: 'plastic', 
+            name: 'প্লাস্টিক টিন',
+            thicknesses: generateThicknesses(0.75, 1.75, 0.25)
+          }
+        ]
       }
-    ],
+    ]
   },
   {
-    id: 'flowerdeutin',
+    id: 'flowerwavetin',
     name: 'ফুলের ঢেউটিন',
-    hasThickness: true,
-    hasSize: true,
-    defaultSizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট'],
     companies: [
       {
         id: 'php',
         name: 'PHP',
         productTypes: [
-          { id: 'standard', name: 'স্ট্যান্ডার্ড', hasColors: false }
-        ],
-        thicknessOptions: [
-          '০.১২০', '০.১৩০', '০.১৪০', '০.১৫০', '০.১৬০', '০.১৭০', '০.১৮০', '০.১৯০', 
-          '০.২০০', '০.২১০', '০.২২০', '০.২৩০', '০.২৪০', '০.২৫০', '০.২৬০', '০.২৭০',
-          '০.২৮০', '০.২৯০', '০.৩০০', '০.৩১০', '০.৩২০', '০.৩৩০', '০.৩৪০', '০.৩৫০',
-          '০.৩৬০', '০.৩৭০', '০.৩৮০', '০.৩৯০', '০.৪০০', '০.৪১০', '০.৪২০', '০.৪৩০',
-          '০.৪৪০', '০.৪৫০', '০.৪৬০', '০.৪৭০', '০.৪৮০', '০.৪৯০', '০.৫০০', '০.৫১০'
-        ],
-        sizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট']
+          { id: 'flowerwave', name: 'ফুলের ঢেউটিন', thicknesses: generateThicknesses(0.120, 0.510, 0.010) }
+        ]
       }
-    ],
+    ]
   },
   {
     id: 'chachplastic',
     name: 'চাচের প্লাস্টিক (সেলু লাইট)',
-    hasThickness: true,
-    hasSize: true,
-    defaultSizeOptions: ['৬ ফুট', '৭ ফুট', '৮ ফুট', '৯ ফুট', '১০ ফুট', '১১ ফুট', '১২ ফুট'],
-    companies: null,
+    // No companies
+    companies: [
+      {
+        id: 'generic',
+        name: 'জেনেরিক',
+        productTypes: [
+          { id: 'chach', name: 'চাচের প্লাস্টিক' }
+        ]
+      }
+    ]
   },
   {
     id: 'chachdigital',
     name: 'চাচ ডিজিটাল',
-    hasThickness: false,
-    hasSize: false,
-    isCountedByPiece: true,
-    companies: null,
+    // Sold by piece, no company, no size
+    companies: [
+      {
+        id: 'generic',
+        name: 'জেনেরিক',
+        productTypes: [
+          { id: 'chachdigital', name: 'চাচ ডিজিটাল' }
+        ]
+      }
+    ]
   },
   {
     id: 'deepchach',
     name: 'ডিপ চাচ',
-    hasThickness: false,
-    hasSize: false,
-    isCountedByPiece: true,
-    companies: null,
+    // Sold by piece, no company, no size
+    companies: [
+      {
+        id: 'generic',
+        name: 'জেনেরিক',
+        productTypes: [
+          { id: 'deepchach', name: 'ডিপ চাচ' }
+        ]
+      }
+    ]
   },
   {
     id: 'coil',
-    name: 'কয়েল (পি-ফোম)',
-    hasThickness: true,
-    hasSize: false,
-    companies: null,
-    defaultThicknessOptions: [
-      '৪', '৫', '৬', '৭', '৮', '৯', '১০', '১১', '১২'
+    name: 'কয়েল (পি-ফোমে)',
+    companies: [
+      {
+        id: 'generic',
+        name: 'জেনেরিক',
+        productTypes: [
+          { 
+            id: 'coil', 
+            name: 'কয়েল',
+            thicknesses: generateThicknesses(4, 12, 1) 
+          }
+        ]
+      }
     ]
   },
   {
     id: 'aluminum',
     name: 'অ্যালুমিনিয়াম',
-    hasThickness: false,
-    hasSize: false,
-    companies: null,
-    productTypes: [
-      { id: 'a-grade', name: 'এ-গ্রেড', hasColors: false },
-      { id: 'b-grade', name: 'বি-গ্রেড', hasColors: false }
+    companies: [
+      {
+        id: 'grade',
+        name: 'গ্রেড',
+        productTypes: [
+          { id: 'grade-a', name: 'এ-গ্রেড' },
+          { id: 'grade-b', name: 'বি-গ্রেড' }
+        ]
+      }
     ]
   },
   {
-    id: 'jhalat',
+    id: 'jhalt',
     name: 'ঝালট',
-    hasThickness: false,
-    hasSize: false,
-    isCountedByPiece: true,
-    companies: null,
+    // Sold by piece, no company, no size
+    companies: [
+      {
+        id: 'generic',
+        name: 'জেনেরিক',
+        productTypes: [
+          { id: 'jhalt', name: 'ঝালট' }
+        ]
+      }
+    ]
   }
 ];
+
+// Helper function to generate thickness values
+function generateThicknesses(start: number, end: number, step: number): string[] {
+  const thicknesses: string[] = [];
+  for (let i = start; i <= end; i += step) {
+    thicknesses.push(i.toFixed(3));
+  }
+  return thicknesses;
+}
+
+// Generate size ranges
+export function generateSizeRange(category: string): string[] {
+  switch(category) {
+    case 'tin':
+    case 'plastictin':
+    case 'flowerwavetin':
+    case 'chachplastic':
+      return ['6', '7', '8', '9', '10', '11', '12'];
+    case 'tuya':
+    case 'plainsheet':
+      return ['6', '7', '8', '9', '10'];
+    default:
+      return [];
+  }
+}
