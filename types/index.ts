@@ -1,358 +1,178 @@
-// Product category types
-export interface ProductType {
+export type User = {
   id: string;
+  phone: string;
   name: string;
-  category: string;
-  subCategory?: string;
-  companyName?: string;
-  productType?: string;
-  color?: string;
-  thickness?: string;
-  size?: string;
-  buyPrice: number;
-  sellPrice: number;
-  stock: number;
-  lowStockThreshold: number;
-  imageUri?: string;
-  unit: 'pieces' | 'feet' | 'meter';
-  createdAt: number;
-  supplierId?: string;
-}
+  role: 'admin' | 'user';
+};
 
-export interface SupplierType {
+export type SupplierType = {
   id: string;
   name: string;
   phone: string;
   address: string;
-  email?: string;
-  unpaidAmount: number;
-  lastPurchaseDate?: number;
-  notes?: string;
-}
+  company: string;
+  balance: number;
+  lastPurchase: string;
+};
 
-export interface CartItemType {
-  product: ProductType;
+export type ProductCategory = 
+  | 'টিন' 
+  | 'টুয়া' 
+  | 'প্লেইন শিট' 
+  | 'ফুলের শিট' 
+  | 'প্লাস্টিকের টিন' 
+  | 'ফুলের ঢেউটিন'
+  | 'চাচের প্লাস্টিক'
+  | 'চাচ ডিজিটাল'
+  | 'ডিপ চাচ'
+  | 'কয়েল'
+  | 'অ্যালুমিনিয়াম'
+  | 'ঝালট';
+
+export type TinCompany = 
+  | 'php' 
+  | 'KY' 
+  | 'TK (G)' 
+  | 'ABUL Khair'
+  | 'Jalalabad'
+  | 'Gelco Steel';
+
+export type TinType = 'সুপার' | 'লুম' | 'কালার' | 'NOF';
+
+export type TinColorType = 'CNG (ডার্ক গ্রীন)' | 'ব্লু' | 'রেড';
+
+export type AluminumGrade = 'এ-গ্রেড' | 'বি-গ্রেড';
+
+export type FlowerSheetPrint = 'প্রিন্টের শিট';
+
+export type ProductImage = {
+  uri: string;
+  base64?: string;
+};
+
+export type Product = {
+  id: string;
+  category: ProductCategory;
+  company?: string;
+  type?: string;
+  color?: string;
+  thickness?: string;
+  size?: string;
+  grade?: string;
+  print?: string;
+  purchasePrice: number;
+  sellingPrice: number;
+  stock: number;
+  lowStockAlert: number;
+  image?: ProductImage;
+  supplier?: string;
+  lastUpdated: string;
+};
+
+export type CartItem = {
+  productId: string;
   quantity: number;
-}
+  product: Product;
+};
 
-export interface SaleType {
-  id: string;
-  customerId?: string;
-  customerName: string;
-  customerPhone?: string;
-  customerAddress?: string;
-  items: CartItemType[];
-  totalAmount: number;
-  discount: number;
-  amountPaid: number;
-  amountDue: number;
-  saleDate: number;
-  createdBy: string;
-}
+export type PriceConfig = {
+  categoryId: string;
+  minPrice: number;
+  maxPrice: number;
+};
 
-// Product category structure
-export interface CategoryStructure {
-  id: string;
-  name: string;
-  companies?: Company[];
-}
+// Thickness ranges for different companies
+export const ThicknessRanges = {
+  php: Array.from({length: 40}, (_, i) => (0.120 + i * 0.010).toFixed(3)),
+  KY: Array.from({length: 40}, (_, i) => (0.120 + i * 0.010).toFixed(3)),
+  'TK (G)': Array.from({length: 40}, (_, i) => (0.120 + i * 0.010).toFixed(3)),
+  'ABUL Khair': Array.from({length: 35}, (_, i) => (0.12 + i * 0.01).toFixed(2)),
+  'Jalalabad': ['0.25', '0.35', '0.38', '0.42', '0.46', '0.48', '0.52', '0.54', '0.58', '0.62', '0.64', '0.72'],
+  'Gelco Steel': Array.from({length: 35}, (_, i) => (0.12 + i * 0.01).toFixed(2)),
+  'RFL': Array.from({length: 5}, (_, i) => (0.75 + i * 0.25).toFixed(2)),
+  'Coil': Array.from({length: 9}, (_, i) => (4 + i * 1).toString()),
+};
 
-export interface Company {
-  id: string;
-  name: string;
-  productTypes: ProductVariant[];
-}
+// Size ranges for different categories
+export const SizeRanges = {
+  'টিন': Array.from({length: 7}, (_, i) => (6 + i).toString()),
+  'টুয়া': Array.from({length: 5}, (_, i) => (6 + i).toString()),
+  'প্লেইন শিট': Array.from({length: 5}, (_, i) => (6 + i).toString()),
+  'ফুলের শিট': Array.from({length: 5}, (_, i) => (6 + i).toString()),
+  'প্লাস্টিকের টিন': Array.from({length: 7}, (_, i) => (6 + i).toString()),
+  'ফুলের ঢেউটিন': Array.from({length: 7}, (_, i) => (6 + i).toString()),
+  'চাচের প্লাস্টিক': Array.from({length: 7}, (_, i) => (6 + i).toString()),
+};
 
-export interface ProductVariant {
-  id: string;
-  name: string;
-  colors?: string[];
-  thicknesses?: string[];
-  sizes?: string[];
-}
-
-// Define all our product categories
-export const PRODUCT_CATEGORIES: CategoryStructure[] = [
-  {
-    id: 'tin',
-    name: 'টিন',
-    companies: [
-      {
-        id: 'php',
-        name: 'PHP',
-        productTypes: [
-          { id: 'super', name: 'সুপার', thicknesses: generateThicknesses(0.120, 0.510, 0.010) },
-          { id: 'loom', name: 'লুম', thicknesses: generateThicknesses(0.120, 0.510, 0.010) },
-          { 
-            id: 'color', 
-            name: 'কালার',
-            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
-            thicknesses: generateThicknesses(0.120, 0.510, 0.010)
-          }
-        ]
-      },
-      {
-        id: 'ky',
-        name: 'KY',
-        productTypes: [
-          { id: 'nof', name: 'NOF', thicknesses: generateThicknesses(0.120, 0.510, 0.010) },
-          { id: 'loom', name: 'লুম', thicknesses: generateThicknesses(0.120, 0.510, 0.010) },
-          { 
-            id: 'color', 
-            name: 'কালার',
-            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
-            thicknesses: generateThicknesses(0.120, 0.510, 0.010)
-          }
-        ]
-      },
-      {
-        id: 'tkg',
-        name: 'TK (G)',
-        productTypes: [
-          { id: 'super', name: 'সুপার', thicknesses: generateThicknesses(0.120, 0.510, 0.010) },
-          { id: 'loom', name: 'লুম', thicknesses: generateThicknesses(0.120, 0.510, 0.010) },
-          { 
-            id: 'color', 
-            name: 'কালার',
-            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
-            thicknesses: generateThicknesses(0.120, 0.510, 0.010)
-          }
-        ]
-      },
-      {
-        id: 'abulkhair',
-        name: 'ABUL Khair',
-        productTypes: [
-          { id: 'super', name: 'সুপার', thicknesses: generateThicknesses(0.120, 0.460, 0.010) },
-          { id: 'loom', name: 'লুম', thicknesses: generateThicknesses(0.120, 0.460, 0.010) },
-          { 
-            id: 'color', 
-            name: 'কালার',
-            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
-            thicknesses: generateThicknesses(0.120, 0.460, 0.010)
-          }
-        ]
-      },
-      {
-        id: 'jalalabad',
-        name: 'Jalalabad',
-        productTypes: [
-          { 
-            id: 'super', 
-            name: 'সুপার', 
-            thicknesses: ['0.25', '0.35', '0.38', '0.42', '0.46', '0.48', '0.52', '0.54', '0.58', '0.62', '0.64', '0.72']
-          },
-          { 
-            id: 'loom', 
-            name: 'লুম', 
-            thicknesses: ['0.25', '0.35', '0.38', '0.42', '0.46', '0.48', '0.52', '0.54', '0.58', '0.62', '0.64', '0.72'] 
-          },
-          { 
-            id: 'color', 
-            name: 'কালার',
-            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
-            thicknesses: ['0.25', '0.35', '0.38', '0.42', '0.46', '0.48', '0.52', '0.54', '0.58', '0.62', '0.64', '0.72']
-          }
-        ]
-      },
-      {
-        id: 'gelcosteel',
-        name: 'Gelco Steel',
-        productTypes: [
-          { id: 'super', name: 'সুপার', thicknesses: generateThicknesses(0.120, 0.460, 0.010) },
-          { id: 'loom', name: 'লুম', thicknesses: generateThicknesses(0.120, 0.460, 0.010) },
-          { 
-            id: 'color', 
-            name: 'কালার',
-            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
-            thicknesses: generateThicknesses(0.120, 0.460, 0.010)
-          }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'tuya',
-    name: 'টুয়া',
-    companies: [
-      {
-        id: 'php',
-        name: 'PHP',
-        productTypes: [
-          { id: 'super', name: 'সুপার', thicknesses: generateThicknesses(0.120, 0.510, 0.010) },
-          { id: 'loom', name: 'লুম', thicknesses: generateThicknesses(0.120, 0.510, 0.010) },
-          { 
-            id: 'color', 
-            name: 'কালার',
-            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
-            thicknesses: generateThicknesses(0.120, 0.510, 0.010)
-          }
-        ]
-      },
-      // Other companies similar to Tin but with different size range (6-10 feet)
-    ]
-  },
-  {
-    id: 'plainsheet',
-    name: 'প্লেইন শিট',
-    // Same structure as tuya
-  },
-  {
-    id: 'flowersheet',
-    name: 'ফুলের শিট',
-    // No companies, but has print types instead
-    companies: [
-      {
-        id: 'print',
-        name: 'প্রিন্ট টাইপ',
-        productTypes: [
-          { id: 'flower1', name: 'ফুল প্যাটার্ন ১' },
-          { id: 'flower2', name: 'ফুল প্যাটার্ন ২' },
-          { id: 'flower3', name: 'ফুল প্যাটার্ন ৩' }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'plastictin',
-    name: 'প্লাস্টিকের টিন',
-    companies: [
-      {
-        id: 'rfl',
-        name: 'RFL',
-        productTypes: [
-          { 
-            id: 'plastic', 
-            name: 'প্লাস্টিক টিন',
-            thicknesses: generateThicknesses(0.75, 1.75, 0.25)
-          }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'flowerwavetin',
-    name: 'ফুলের ঢেউটিন',
-    companies: [
-      {
-        id: 'php',
-        name: 'PHP',
-        productTypes: [
-          { id: 'flowerwave', name: 'ফুলের ঢেউটিন', thicknesses: generateThicknesses(0.120, 0.510, 0.010) }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'chachplastic',
-    name: 'চাচের প্লাস্টিক (সেলু লাইট)',
-    // No companies
-    companies: [
-      {
-        id: 'generic',
-        name: 'জেনেরিক',
-        productTypes: [
-          { id: 'chach', name: 'চাচের প্লাস্টিক' }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'chachdigital',
-    name: 'চাচ ডিজিটাল',
-    // Sold by piece, no company, no size
-    companies: [
-      {
-        id: 'generic',
-        name: 'জেনেরিক',
-        productTypes: [
-          { id: 'chachdigital', name: 'চাচ ডিজিটাল' }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'deepchach',
-    name: 'ডিপ চাচ',
-    // Sold by piece, no company, no size
-    companies: [
-      {
-        id: 'generic',
-        name: 'জেনেরিক',
-        productTypes: [
-          { id: 'deepchach', name: 'ডিপ চাচ' }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'coil',
-    name: 'কয়েল (পি-ফোমে)',
-    companies: [
-      {
-        id: 'generic',
-        name: 'জেনেরিক',
-        productTypes: [
-          { 
-            id: 'coil', 
-            name: 'কয়েল',
-            thicknesses: generateThicknesses(4, 12, 1) 
-          }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'aluminum',
-    name: 'অ্যালুমিনিয়াম',
-    companies: [
-      {
-        id: 'grade',
-        name: 'গ্রেড',
-        productTypes: [
-          { id: 'grade-a', name: 'এ-গ্রেড' },
-          { id: 'grade-b', name: 'বি-গ্রেড' }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'jhalt',
-    name: 'ঝালট',
-    // Sold by piece, no company, no size
-    companies: [
-      {
-        id: 'generic',
-        name: 'জেনেরিক',
-        productTypes: [
-          { id: 'jhalt', name: 'ঝালট' }
-        ]
-      }
-    ]
-  }
+// Default product data structure
+export const DefaultProductCategories: ProductCategory[] = [
+  'টিন', 'টুয়া', 'প্লেইন শিট', 'ফুলের শিট', 'প্লাস্টিকের টিন', 'ফুলের ঢেউটিন',
+  'চাচের প্লাস্টিক', 'চাচ ডিজিটাল', 'ডিপ চাচ', 'কয়েল', 'অ্যালুমিনিয়াম', 'ঝালট'
 ];
 
-// Helper function to generate thickness values
-function generateThicknesses(start: number, end: number, step: number): string[] {
-  const thicknesses: string[] = [];
-  for (let i = start; i <= end; i += step) {
-    thicknesses.push(i.toFixed(3));
-  }
-  return thicknesses;
-}
+export const DefaultCompanies = {
+  'টিন': ['php', 'KY', 'TK (G)', 'ABUL Khair', 'Jalalabad', 'Gelco Steel'],
+  'টুয়া': ['php', 'KY', 'TK (G)', 'ABUL Khair', 'Jalalabad', 'Gelco Steel'],
+  'প্লেইন শিট': ['php', 'KY', 'TK (G)', 'ABUL Khair', 'Jalalabad', 'Gelco Steel'],
+  'ফুলের শিট': [], // No companies, but prints instead
+  'প্লাস্টিকের টিন': ['RFL'],
+  'ফুলের ঢেউটিন': ['php'],
+  'চাচের প্লাস্টিক': [], // No companies
+  'চাচ ডিজিটাল': [], // No companies
+  'ডিপ চাচ': [], // No companies
+  'কয়েল': [], // Generic
+  'অ্যালুমিনিয়াম': [], // Just grades
+  'ঝালট': [], // No companies
+};
 
-// Generate size ranges
-export function generateSizeRange(category: string): string[] {
-  switch(category) {
-    case 'tin':
-    case 'plastictin':
-    case 'flowerwavetin':
-    case 'chachplastic':
-      return ['6', '7', '8', '9', '10', '11', '12'];
-    case 'tuya':
-    case 'plainsheet':
-      return ['6', '7', '8', '9', '10'];
-    default:
-      return [];
-  }
-}
+export const DefaultProductTypes = {
+  'php': ['সুপার', 'লুম', 'কালার'],
+  'KY': ['NOF', 'লুম', 'কালার'],
+  'TK (G)': ['সুপার', 'লুম', 'কালার'],
+  'ABUL Khair': ['সুপার', 'লুম', 'কালার'],
+  'Jalalabad': ['সুপার', 'লুম', 'কালার'],
+  'Gelco Steel': ['সুপার', 'লুম', 'কালার'],
+};
+
+export const DefaultColorTypes = {
+  'কালার': ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
+};
+
+export const DefaultFlowerSheetPrints = ['প্রিন্টের শিট'];
+
+export const DefaultAluminumGrades = ['এ-গ্রেড', 'বি-গ্রেড'];
+
+export type BillInfo = {
+  customerName: string;
+  customerPhone: string;
+  customerAddress: string;
+  date: string;
+  discount: number;
+  advance: number;
+  totalAmount: number;
+  items: CartItem[];
+};
+
+export type StockItem = {
+  id: string;
+  productId: string;
+  date: string;
+  quantity: number;
+  type: 'in' | 'out';
+  supplierId?: string;
+  billId?: string;
+  notes?: string;
+};
+
+export type PriceListItem = {
+  id: string;
+  category: string;
+  company?: string;
+  type?: string;
+  thickness?: string;
+  size?: string;
+  purchasePrice: number;
+  sellingPrice: number;
+  profit: number;
+  updatedAt: string;
+};
