@@ -8,8 +8,7 @@ import {
   TextInput,
   Alert,
   Modal,
-  Platform,
-  SafeAreaView
+  Platform
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons, MaterialIcons, FontAwesome } from '@expo/vector-icons';
@@ -160,258 +159,252 @@ export default function CartScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.header}>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color="#000" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>আপনার কার্ট</Text>
+        {cartItems && cartItems.length > 0 && (
           <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
+            style={styles.clearButton}
+            onPress={() => {
+              Alert.alert(
+                'নিশ্চিত করুন',
+                'আপনি কি কার্ট পরিষ্কার করতে চান?',
+                [
+                  { text: 'না', style: 'cancel' },
+                  { text: 'হ্যাঁ', onPress: () => clearCart() }
+                ]
+              );
+            }}
           >
-            <Ionicons name="arrow-back" size={24} color="#000" />
+            <MaterialIcons name="delete-sweep" size={24} color="#ff5722" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>আপনার কার্ট</Text>
-          {cartItems && cartItems.length > 0 && (
-            <TouchableOpacity
-              style={styles.clearButton}
-              onPress={() => {
-                Alert.alert(
-                  'নিশ্চিত করুন',
-                  'আপনি কি কার্ট পরিষ্কার করতে চান?',
-                  [
-                    { text: 'না', style: 'cancel' },
-                    { text: 'হ্যাঁ', onPress: () => clearCart() }
-                  ]
-                );
-              }}
-            >
-              <MaterialIcons name="delete-sweep" size={24} color="#ff5722" />
-            </TouchableOpacity>
-          )}
-        </View>
+        )}
+      </View>
 
-        {!cartItems || cartItems.length === 0 ? (
-          <View style={styles.emptyCartContainer}>
-            <MaterialIcons name="shopping-cart" size={80} color="#e0e0e0" />
-            <Text style={styles.emptyCartText}>আপনার কার্ট খালি</Text>
-            <TouchableOpacity
-              style={styles.shopNowButton}
-              onPress={() => navigation.navigate('ProductSelection' as never)}
-            >
-              <Text style={styles.shopNowButtonText}>পণ্য নির্বাচন করুন</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            <ScrollView style={styles.cartItemsContainer}>
-              {cartItems.map((item) => (
-                <View key={item.id} style={styles.cartItem}>
-                  <View style={styles.itemInfo}>
-                    <View>
-                      <Text style={styles.itemCategory}>{item.category}</Text>
-                      <Text style={styles.itemDetails}>
-                        {item.company ? `${item.company}, ` : ''}
-                        {item.type ? `${item.type}, ` : ''}
-                        {item.color ? `${item.color}, ` : ''}
-                        {item.thickness ? `${item.thickness} মিমি, ` : ''}
-                        {item.size}
-                      </Text>
-                    </View>
-                    
-                    <View style={styles.priceContainer}>
-                      <Text style={styles.itemPrice}>
-                        {formatCurrency(item.salePrice || 0)} × {item.quantity || 1}
-                      </Text>
-                      <Text style={styles.itemTotalPrice}>
-                        {formatCurrency((item.salePrice || 0) * (item.quantity || 1))}
-                      </Text>
-                    </View>
+      {!cartItems || cartItems.length === 0 ? (
+        <View style={styles.emptyCartContainer}>
+          <MaterialIcons name="shopping-cart" size={80} color="#e0e0e0" />
+          <Text style={styles.emptyCartText}>আপনার কার্ট খালি</Text>
+          <TouchableOpacity
+            style={styles.shopNowButton}
+            onPress={() => navigation.navigate('ProductSelection' as never)}
+          >
+            <Text style={styles.shopNowButtonText}>পণ্য নির্বাচন করুন</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <>
+          <ScrollView style={styles.cartItemsContainer}>
+            {cartItems.map((item) => (
+              <View key={item.id} style={styles.cartItem}>
+                <View style={styles.itemInfo}>
+                  <View>
+                    <Text style={styles.itemCategory}>{item.category}</Text>
+                    <Text style={styles.itemDetails}>
+                      {item.company ? `${item.company}, ` : ''}
+                      {item.type ? `${item.type}, ` : ''}
+                      {item.color ? `${item.color}, ` : ''}
+                      {item.thickness ? `${item.thickness} মিমি, ` : ''}
+                      {item.size}
+                    </Text>
                   </View>
                   
-                  <View style={styles.itemActions}>
-                    <View style={styles.quantityControl}>
-                      <TouchableOpacity
-                        style={styles.quantityButton}
-                        onPress={() => handleDecreaseQuantity(item.id)}
-                      >
-                        <Text style={styles.quantityButtonText}>-</Text>
-                      </TouchableOpacity>
-                      
-                      <Text style={styles.quantityText}>{item.quantity || 1}</Text>
-                      
-                      <TouchableOpacity
-                        style={styles.quantityButton}
-                        onPress={() => handleIncreaseQuantity(item.id)}
-                      >
-                        <Text style={styles.quantityButtonText}>+</Text>
-                      </TouchableOpacity>
-                    </View>
-                    
-                    <TouchableOpacity
-                      style={styles.removeButton}
-                      onPress={() => handleRemoveItem(item.id)}
-                    >
-                      <MaterialIcons name="delete" size={20} color="#fff" />
-                    </TouchableOpacity>
-                  </View>
-                  
-                  <View style={styles.profitContainer}>
-                    <Text style={styles.profitText}>
-                      লাভ: {formatCurrency(calculateProfit(item))}
+                  <View style={styles.priceContainer}>
+                    <Text style={styles.itemPrice}>
+                      {formatCurrency(item.salePrice || 0)} × {item.quantity || 1}
+                    </Text>
+                    <Text style={styles.itemTotalPrice}>
+                      {formatCurrency((item.salePrice || 0) * (item.quantity || 1))}
                     </Text>
                   </View>
                 </View>
-              ))}
-            </ScrollView>
+                
+                <View style={styles.itemActions}>
+                  <View style={styles.quantityControl}>
+                    <TouchableOpacity
+                      style={styles.quantityButton}
+                      onPress={() => handleDecreaseQuantity(item.id)}
+                    >
+                      <Text style={styles.quantityButtonText}>-</Text>
+                    </TouchableOpacity>
+                    
+                    <Text style={styles.quantityText}>{item.quantity || 1}</Text>
+                    
+                    <TouchableOpacity
+                      style={styles.quantityButton}
+                      onPress={() => handleIncreaseQuantity(item.id)}
+                    >
+                      <Text style={styles.quantityButtonText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                  
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => handleRemoveItem(item.id)}
+                  >
+                    <MaterialIcons name="delete" size={20} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+                
+                <View style={styles.profitContainer}>
+                  <Text style={styles.profitText}>
+                    লাভ: {formatCurrency(calculateProfit(item))}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+          
+          <View style={styles.summaryContainer}>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>মোট পণ্য</Text>
+              <Text style={styles.summaryValue}>{cartItems ? cartItems.length : 0}</Text>
+            </View>
             
-            <View style={styles.summaryContainer}>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>মোট পণ্য</Text>
-                <Text style={styles.summaryValue}>{cartItems ? cartItems.length : 0}</Text>
-              </View>
-              
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>সাবটোটাল</Text>
-                <Text style={styles.summaryValue}>{formatCurrency(subtotal)}</Text>
-              </View>
-              
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>ডিসকাউন্ট</Text>
-                <Text style={styles.summaryValue}>{formatCurrency(discountAmount)}</Text>
-              </View>
-              
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabelTotal}>মোট</Text>
-                <Text style={styles.summaryValueTotal}>{formatCurrency(totalAmount)}</Text>
-              </View>
-              
-              <TouchableOpacity
-                style={styles.checkoutButton}
-                onPress={handleCheckout}
-              >
-                <Text style={styles.checkoutButtonText}>চেকআউট</Text>
-                <MaterialIcons name="arrow-forward" size={20} color="#fff" />
-              </TouchableOpacity>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>সাবটোটাল</Text>
+              <Text style={styles.summaryValue}>{formatCurrency(subtotal)}</Text>
             </View>
-          </>
-        )}
-        
-        {/* Checkout Modal */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={checkoutModalVisible}
-          onRequestClose={() => setCheckoutModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>বিক্রয় সম্পন্ন করুন</Text>
-              
-              <ScrollView style={styles.modalScrollView}>
-                <Text style={styles.modalSectionTitle}>কাস্টমার তথ্য</Text>
-                
-                <Text style={styles.inputLabel}>কাস্টমারের নাম *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={customerName}
-                  onChangeText={setCustomerName}
-                  placeholder="কাস্টমারের নাম লিখুন"
-                />
-                
-                <Text style={styles.inputLabel}>মোবাইল নম্বর</Text>
-                <TextInput
-                  style={styles.input}
-                  value={customerMobile}
-                  onChangeText={setCustomerMobile}
-                  placeholder="মোবাইল নম্বর লিখুন"
-                  keyboardType="phone-pad"
-                />
-                
-                <Text style={styles.inputLabel}>ঠিকানা</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  value={customerAddress}
-                  onChangeText={setCustomerAddress}
-                  placeholder="ঠিকানা লিখুন"
-                  multiline
-                  numberOfLines={3}
-                />
-                
-                <Text style={styles.modalSectionTitle}>অর্থ প্রদান</Text>
-                
-                <Text style={styles.inputLabel}>ডিসকাউন্ট (%)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={discountPercent}
-                  onChangeText={setDiscountPercent}
-                  placeholder="ডিসকাউন্ট শতাংশ"
-                  keyboardType="numeric"
-                />
-                
-                <Text style={styles.inputLabel}>অগ্রিম (৳)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={advanceAmount}
-                  onChangeText={setAdvanceAmount}
-                  placeholder="অগ্রিম পরিমাণ"
-                  keyboardType="numeric"
-                />
-                
-                <View style={styles.paymentSummary}>
-                  <View style={styles.paymentRow}>
-                    <Text style={styles.paymentLabel}>সাবটোটাল:</Text>
-                    <Text style={styles.paymentValue}>{formatCurrency(subtotal)}</Text>
-                  </View>
-                  
-                  <View style={styles.paymentRow}>
-                    <Text style={styles.paymentLabel}>ডিসকাউন্ট:</Text>
-                    <Text style={styles.paymentValue}>- {formatCurrency(discountAmount)}</Text>
-                  </View>
-                  
-                  <View style={styles.paymentRow}>
-                    <Text style={styles.paymentLabel}>মোট:</Text>
-                    <Text style={styles.paymentValue}>{formatCurrency(totalAmount)}</Text>
-                  </View>
-                  
-                  <View style={styles.paymentRow}>
-                    <Text style={styles.paymentLabel}>অগ্রিম:</Text>
-                    <Text style={styles.paymentValue}>{formatCurrency(parseFloat(advanceAmount) || 0)}</Text>
-                  </View>
-                  
-                  <View style={[styles.paymentRow, styles.dueRow]}>
-                    <Text style={styles.dueLabel}>বাকি:</Text>
-                    <Text style={styles.dueValue}>{formatCurrency(dueAmount)}</Text>
-                  </View>
-                </View>
-                
-                <View style={styles.modalButtonContainer}>
-                  <TouchableOpacity
-                    style={styles.cancelButton}
-                    onPress={() => setCheckoutModalVisible(false)}
-                  >
-                    <Text style={styles.cancelButtonText}>বাতিল</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={styles.confirmButton}
-                    onPress={handleCompleteCheckout}
-                  >
-                    <Text style={styles.confirmButtonText}>সম্পন্ন করুন</Text>
-                  </TouchableOpacity>
-                </View>
-              </ScrollView>
+            
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>ডিসকাউন্ট</Text>
+              <Text style={styles.summaryValue}>{formatCurrency(discountAmount)}</Text>
             </View>
+            
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabelTotal}>মোট</Text>
+              <Text style={styles.summaryValueTotal}>{formatCurrency(totalAmount)}</Text>
+            </View>
+            
+            <TouchableOpacity
+              style={styles.checkoutButton}
+              onPress={handleCheckout}
+            >
+              <Text style={styles.checkoutButtonText}>চেকআউট</Text>
+              <MaterialIcons name="arrow-forward" size={20} color="#fff" />
+            </TouchableOpacity>
           </View>
-        </Modal>
-      </View>
-    </SafeAreaView>
+        </>
+      )}
+      
+      {/* Checkout Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={checkoutModalVisible}
+        onRequestClose={() => setCheckoutModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>বিক্রয় সম্পন্ন করুন</Text>
+            
+            <ScrollView style={styles.modalScrollView}>
+              <Text style={styles.modalSectionTitle}>কাস্টমার তথ্য</Text>
+              
+              <Text style={styles.inputLabel}>কাস্টমারের নাম *</Text>
+              <TextInput
+                style={styles.input}
+                value={customerName}
+                onChangeText={setCustomerName}
+                placeholder="কাস্টমারের নাম লিখুন"
+              />
+              
+              <Text style={styles.inputLabel}>মোবাইল নম্বর</Text>
+              <TextInput
+                style={styles.input}
+                value={customerMobile}
+                onChangeText={setCustomerMobile}
+                placeholder="মোবাইল নম্বর লিখুন"
+                keyboardType="phone-pad"
+              />
+              
+              <Text style={styles.inputLabel}>ঠিকানা</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={customerAddress}
+                onChangeText={setCustomerAddress}
+                placeholder="ঠিকানা লিখুন"
+                multiline
+                numberOfLines={3}
+              />
+              
+              <Text style={styles.modalSectionTitle}>অর্থ প্রদান</Text>
+              
+              <Text style={styles.inputLabel}>ডিসকাউন্ট (%)</Text>
+              <TextInput
+                style={styles.input}
+                value={discountPercent}
+                onChangeText={setDiscountPercent}
+                placeholder="ডিসকাউন্ট শতাংশ"
+                keyboardType="numeric"
+              />
+              
+              <Text style={styles.inputLabel}>অগ্রিম (৳)</Text>
+              <TextInput
+                style={styles.input}
+                value={advanceAmount}
+                onChangeText={setAdvanceAmount}
+                placeholder="অগ্রিম পরিমাণ"
+                keyboardType="numeric"
+              />
+              
+              <View style={styles.paymentSummary}>
+                <View style={styles.paymentRow}>
+                  <Text style={styles.paymentLabel}>সাবটোটাল:</Text>
+                  <Text style={styles.paymentValue}>{formatCurrency(subtotal)}</Text>
+                </View>
+                
+                <View style={styles.paymentRow}>
+                  <Text style={styles.paymentLabel}>ডিসকাউন্ট:</Text>
+                  <Text style={styles.paymentValue}>- {formatCurrency(discountAmount)}</Text>
+                </View>
+                
+                <View style={styles.paymentRow}>
+                  <Text style={styles.paymentLabel}>মোট:</Text>
+                  <Text style={styles.paymentValue}>{formatCurrency(totalAmount)}</Text>
+                </View>
+                
+                <View style={styles.paymentRow}>
+                  <Text style={styles.paymentLabel}>অগ্রিম:</Text>
+                  <Text style={styles.paymentValue}>{formatCurrency(parseFloat(advanceAmount) || 0)}</Text>
+                </View>
+                
+                <View style={[styles.paymentRow, styles.dueRow]}>
+                  <Text style={styles.dueLabel}>বাকি:</Text>
+                  <Text style={styles.dueValue}>{formatCurrency(dueAmount)}</Text>
+                </View>
+              </View>
+              
+              <View style={styles.modalButtonContainer}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => setCheckoutModalVisible(false)}
+                >
+                  <Text style={styles.cancelButtonText}>বাতিল</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={styles.confirmButton}
+                  onPress={handleCompleteCheckout}
+                >
+                  <Text style={styles.confirmButtonText}>সম্পন্ন করুন</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
   container: {
     flex: 1,
     backgroundColor: '#f8f8f8',

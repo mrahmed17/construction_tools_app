@@ -3,526 +3,433 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
+  ScrollView,
   Alert,
-  Image,
-  SafeAreaView,
+  Image
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { MaterialIcons, Ionicons, FontAwesome5, Entypo } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useProducts } from '../context/ProductContext';
+import { Ionicons } from '@expo/vector-icons';
 import { useCart } from '../context/CartContext';
+import { useProduct } from '../context/ProductContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const HomeScreen = () => {
   const navigation = useNavigation();
-  // Commented out auth for now as requested
-  // const { user } = useAuth();
-  const { products, categories, getLowStockProducts, loading } = useProducts();
   const { cartItems } = useCart();
-
-  // Demo stats
-  const [stats, setStats] = useState({
-    totalProducts: 0,
-    lowStockCount: 0,
-    totalCategories: 0,
-    recentSales: 0,
-  });
-
-  // Recent transactions
-  const [recentTransactions, setRecentTransactions] = useState([]);
-
-  // Add sample sales data for report demo
+  const { products, getLowStockProducts } = useProduct();
+  
+  const [sales, setSales] = useState([]);
+  const [totalRevenue, setTotalRevenue] = useState(0);
+  const [totalProfit, setTotalProfit] = useState(0);
+  const [lowStockItems, setLowStockItems] = useState([]);
+  const [recentSales, setRecentSales] = useState([]);
+  
+  // Load sales data from AsyncStorage
   useEffect(() => {
-    const addSampleSalesData = async () => {
+    const loadSales = async () => {
       try {
-        // Check if we already have sales data
-        const existingSales = await AsyncStorage.getItem('sales');
-        if (!existingSales) {
-          const pastWeekSales = [];
-          const today = new Date();
+        const salesData = await AsyncStorage.getItem('sales');
+        if (salesData) {
+          const parsedSales = JSON.parse(salesData);
+          setSales(parsedSales);
           
-          // Create 30 days of random sales data
-          for (let i = 0; i < 30; i++) {
-            const saleDate = new Date(today);
-            saleDate.setDate(today.getDate() - i);
-            
-            // Generate 1-3 sales for each day
-            const dailySalesCount = Math.floor(Math.random() * 3) + 1;
-            
-            for (let j = 0; j < dailySalesCount; j++) {
-              const itemCount = Math.floor(Math.random() * 5) + 1;
-              const items = [];
-              
-              // Generate random items
-              for (let k = 0; k < itemCount; k++) {
-                const purchasePrice = Math.floor(Math.random() * 1000) + 500;
-                const sellingPrice = purchasePrice + Math.floor(Math.random() * 300);
-                items.push({
-                  id: `item-${Date.now()}-${k}`,
-                  category: ['টিন', 'টুয়া', 'প্লেইন শিট', 'ফুলের শিট'][Math.floor(Math.random() * 4)],
-                  company: ['php', 'KY', 'TK (G)', 'ABUL Khair'][Math.floor(Math.random() * 4)],
-                  product: ['সুপার', 'লুম', 'কালার'][Math.floor(Math.random() * 3)],
-                  quantity: Math.floor(Math.random() * 10) + 1,
-                  purchasePrice,
-                  sellingPrice,
-                  profit: sellingPrice - purchasePrice
-                });
-              }
-              
-              // Calculate totals
-              const totalAmount = items.reduce((sum, item) => sum + (item.sellingPrice * item.quantity), 0);
-              const totalProfit = items.reduce((sum, item) => sum + (item.profit * item.quantity), 0);
-              
-              // Create sale record
-              const sale = {
-                id: `sale-${Date.now()}-${i}-${j}`,
-                date: saleDate.toISOString(),
-                customerName: ['আলি হোসেন', 'করিম মিয়া', 'আব্দুল রহমান', 'মঞ্জুর আলম', 'রফিকুল ইসলাম'][Math.floor(Math.random() * 5)],
-                items,
-                totalAmount,
-                totalProfit,
-                discount: Math.random() > 0.7 ? Math.floor(Math.random() * 500) : 0
-              };
-              
-              pastWeekSales.push(sale);
-            }
-          }
+          // Calculate revenue and profit
+          const revenue = parsedSales.reduce((sum, sale) => sum + sale.finalAmount, 0);
+          const profit = parsedSales.reduce((sum, sale) => sum + sale.profit, 0);
           
-          // Save to AsyncStorage
-          await AsyncStorage.setItem('sales', JSON.stringify(pastWeekSales));
+          setTotalRevenue(revenue);
+          setTotalProfit(profit);
           
-          // Also update recent transactions
-          setRecentTransactions(pastWeekSales.slice(0, 5).map(sale => ({
-            id: sale.id,
-            date: sale.date,
-            customerName: sale.customerName,
-            total: sale.totalAmount,
-            items: sale.items.length
-          })));
+          // Get recent sales (last 5)
+          const recent = parsedSales.sort((a, b) => 
+            new Date(b.date).getTime() - new Date(a.date).getTime()
+          ).slice(0, 5);
           
-          // Update today's sales in stats
-          const todaySales = pastWeekSales.filter(sale => {
-            const saleDate = new Date(sale.date);
-            return saleDate.getDate() === today.getDate() && 
-                   saleDate.getMonth() === today.getMonth() && 
-                   saleDate.getFullYear() === today.getFullYear();
-          });
-          
-          const todayTotal = todaySales.reduce((sum, sale) => sum + sale.totalAmount, 0);
-          
-          setStats(prev => ({
-            ...prev,
-            recentSales: todayTotal
-          }));
-          
-          await AsyncStorage.setItem('recentTransactions', JSON.stringify(pastWeekSales.slice(0, 5).map(sale => ({
-            id: sale.id,
-            date: sale.date,
-            customerName: sale.customerName,
-            total: sale.totalAmount,
-            items: sale.items.length
-          }))));
+          setRecentSales(recent);
         }
       } catch (error) {
-        console.error('Error adding sample sales data:', error);
+        console.error('Error loading sales data:', error);
       }
     };
     
-    addSampleSalesData();
+    loadSales();
   }, []);
-
-  // Check low stock alert
+  
+  // Check for low stock items
   useEffect(() => {
-    if (products && products.length > 0) {
-      const lowStockProducts = getLowStockProducts();
+    if (getLowStockProducts) {
+      const lowStock = getLowStockProducts();
+      setLowStockItems(lowStock);
       
-      if (lowStockProducts && lowStockProducts.length > 0) {
+      // Show alert if there are low stock items
+      if (lowStock && lowStock.length > 0) {
         Alert.alert(
           'কম স্টক সতর্কতা',
-          `${lowStockProducts.length}টি পণ্যের স্টক কম রয়েছে। দয়া করে যাচাই করুন।`,
-          [
-            { text: 'পরে', style: 'cancel' },
-            { 
-              text: 'স্টক দেখুন', 
-              onPress: () => navigation.navigate('StockManagement' as never) 
-            }
-          ]
+          `${lowStock.length}টি পণ্যের স্টক কম রয়েছে। বিস্তারিত দেখতে স্টক মনিটরিং পৃষ্ঠা দেখুন।`,
+          [{ text: 'ঠিক আছে', onPress: () => console.log('Alert closed') }]
         );
       }
-      
-      // Update stats
-      setStats(prev => ({
-        ...prev,
-        totalProducts: products.length,
-        lowStockCount: lowStockProducts ? lowStockProducts.length : 0,
-        totalCategories: Array.isArray(categories) ? categories.length : 0,
-      }));
     }
-  }, [products, categories]);
-
-  // Load recent transactions from AsyncStorage
-  useEffect(() => {
-    const loadTransactions = async () => {
-      try {
-        const savedTransactions = await AsyncStorage.getItem('recentTransactions');
-        if (savedTransactions) {
-          setRecentTransactions(JSON.parse(savedTransactions).slice(0, 5)); // Show only latest 5
-        }
-      } catch (error) {
-        console.error('Error loading transactions:', error);
-      }
-    };
-    
-    loadTransactions();
-  }, []);
-
-  const openDrawer = () => {
-    navigation.openDrawer();
-  };
+  }, [getLowStockProducts]);
   
-  // Format date
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
-  };
+  // Calculate total stock value
+  const totalStock = products ? products.length : 0;
+  const totalStockValue = products 
+    ? products.reduce((sum, product) => sum + (product.purchasePrice * product.stock), 0)
+    : 0;
   
-  // Format currency
-  const formatCurrency = (amount) => {
-    return `৳${amount.toLocaleString()}`;
-  };
-
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={openDrawer}>
-            <Ionicons name="menu" size={30} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>ঘর তৈরির সরঞ্জাম</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Cart' as never)}>
-            <View style={styles.cartIconContainer}>
-              <Ionicons name="cart-outline" size={28} color="#333" />
-              {cartItems && cartItems.length > 0 && (
-                <View style={styles.cartBadge}>
-                  <Text style={styles.cartBadgeText}>{cartItems.length}</Text>
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.welcomeContainer}>
+    <ScrollView style={styles.container}>
+      {/* Dashboard Header */}
+      <View style={styles.header}>
+        <Image 
+          source={{ uri: 'https://api.a0.dev/assets/image?text=টিন+শিট+ইত্যাদি+নির্মাণ+সামগ্রী&aspect=1:1' }}
+          style={styles.headerImage}
+        />
+        <View style={styles.headerTextContainer}>
           <Text style={styles.welcomeText}>স্বাগতম</Text>
-          <Text style={styles.businessName}>আপনার ব্যবসা</Text>
+          <Text style={styles.businessText}>আপনার নির্মাণ সামগ্রীর দোকানে</Text>
         </View>
-
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <View style={[styles.statIconContainer, { backgroundColor: '#e3f2fd' }]}>
-              <MaterialIcons name="inventory" size={24} color="#1976d2" />
-            </View>
-            <View>
-              <Text style={styles.statValue}>{stats.totalProducts}</Text>
-              <Text style={styles.statLabel}>মোট পণ্য</Text>
-            </View>
-          </View>
-          
-          <View style={styles.statCard}>
-            <View style={[styles.statIconContainer, { backgroundColor: '#fce4ec' }]}>
-              <MaterialIcons name="warning" size={24} color="#d81b60" />
-            </View>
-            <View>
-              <Text style={styles.statValue}>{stats.lowStockCount}</Text>
-              <Text style={styles.statLabel}>কম স্টক</Text>
-            </View>
-          </View>
-          
-          <View style={styles.statCard}>
-            <View style={[styles.statIconContainer, { backgroundColor: '#e0f2f1' }]}>
-              <MaterialIcons name="category" size={24} color="#009688" />
-            </View>
-            <View>
-              <Text style={styles.statValue}>{stats.totalCategories}</Text>
-              <Text style={styles.statLabel}>ক্যাটাগরি</Text>
-            </View>
-          </View>
-          
-          <View style={styles.statCard}>
-            <View style={[styles.statIconContainer, { backgroundColor: '#f3e5f5' }]}>
-              <FontAwesome5 name="money-bill-wave" size={18} color="#7b1fa2" />
-            </View>
-            <View>
-              <Text style={styles.statValue}>{formatCurrency(stats.recentSales)}</Text>
-              <Text style={styles.statLabel}>আজকের বিক্রয়</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.quickActionsContainer}>
-          <Text style={styles.sectionTitle}>দ্রুত অ্যাকশন</Text>
-          <View style={styles.quickActions}>
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('ProductSelection' as never)}
-            >
-              <View style={[styles.actionIconContainer, { backgroundColor: '#e3f2fd' }]}>
-                <MaterialIcons name="shopping-bag" size={24} color="#1976d2" />
-              </View>
-              <Text style={styles.actionText}>নতুন বিক্রয়</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('StockManagement' as never)}
-            >
-              <View style={[styles.actionIconContainer, { backgroundColor: '#e8f5e9' }]}>
-                <MaterialIcons name="add-box" size={24} color="#388e3c" />
-              </View>
-              <Text style={styles.actionText}>স্টক যোগ করুন</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('ProductManagement' as never)}
-            >
-              <View style={[styles.actionIconContainer, { backgroundColor: '#fff3e0' }]}>
-                <MaterialIcons name="edit" size={24} color="#f57c00" />
-              </View>
-              <Text style={styles.actionText}>পণ্য ব্যবস্থাপনা</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('Supplier' as never)}
-            >
-              <View style={[styles.actionIconContainer, { backgroundColor: '#f3e5f5' }]}>
-                <Entypo name="users" size={22} color="#7b1fa2" />
-              </View>
-              <Text style={styles.actionText}>সাপ্লায়ার</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('PriceConfig' as never)}
-            >
-              <View style={[styles.actionIconContainer, { backgroundColor: '#e0f7fa' }]}>
-                <MaterialIcons name="price-change" size={24} color="#0097a7" />
-              </View>
-              <Text style={styles.actionText}>মূল্য তালিকা</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('Report' as never)}
-            >
-              <View style={[styles.actionIconContainer, { backgroundColor: '#fff8e1' }]}>
-                <MaterialIcons name="bar-chart" size={24} color="#ffa000" />
-              </View>
-              <Text style={styles.actionText}>রিপোর্ট</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.recentTransactionsContainer}>
-          <Text style={styles.sectionTitle}>সাম্প্রতিক বিক্রয়</Text>
-          {recentTransactions && recentTransactions.length > 0 ? (
-            recentTransactions.map((transaction, index) => (
-              <View key={transaction.id} style={styles.transactionCard}>
-                <View style={styles.transactionLeft}>
-                  <Text style={styles.transactionDate}>{formatDate(transaction.date)}</Text>
-                  <Text style={styles.transactionCustomer}>{transaction.customerName}</Text>
-                  <Text style={styles.transactionItems}>{transaction.items} টি আইটেম</Text>
-                </View>
-                <View style={styles.transactionRight}>
-                  <Text style={styles.transactionAmount}>
-                    {formatCurrency(transaction.total)}
-                  </Text>
-                </View>
-              </View>
-            ))
-          ) : (
-            <View style={styles.noTransactionsContainer}>
-              <MaterialIcons name="receipt-long" size={48} color="#bdbdbd" />
-              <Text style={styles.noTransactionsText}>কোন বিক্রয় রেকর্ড নেই</Text>
-            </View>
-          )}
+      </View>
+      
+      {/* Stats Cards */}
+      <View style={styles.statsContainer}>
+        <View style={styles.statsCard}>
+          <Text style={styles.statsValue}>{totalRevenue.toLocaleString('bn-BD')} ৳</Text>
+          <Text style={styles.statsLabel}>মোট বিক্রয়</Text>
         </View>
         
-        <View style={styles.spacer} />
-      </ScrollView>
-    </SafeAreaView>
+        <View style={styles.statsCard}>
+          <Text style={styles.statsValue}>{totalProfit.toLocaleString('bn-BD')} ৳</Text>
+          <Text style={styles.statsLabel}>মোট লাভ</Text>
+        </View>
+        
+        <View style={styles.statsCard}>
+          <Text style={styles.statsValue}>{totalStock}</Text>
+          <Text style={styles.statsLabel}>পণ্য সংখ্যা</Text>
+        </View>
+        
+        <View style={styles.statsCard}>
+          <Text style={styles.statsValue}>{lowStockItems ? lowStockItems.length : 0}</Text>
+          <Text style={styles.statsLabel}>কম স্টক পণ্য</Text>
+        </View>
+      </View>
+      
+      {/* Quick Actions */}
+      <View style={styles.actionButtonsContainer}>
+        <Text style={styles.sectionTitle}>দ্রুত কার্যক্রম</Text>
+        <View style={styles.actionButtons}>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('ProductSelection')}
+          >
+            <Ionicons name="add-circle" size={24} color="#4CAF50" />
+            <Text style={styles.actionButtonText}>নতুন বিক্রয়</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('StockManagement')}
+          >
+            <Ionicons name="refresh" size={24} color="#2196F3" />
+            <Text style={styles.actionButtonText}>স্টক আপডেট</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('Report')}
+          >
+            <Ionicons name="document-text" size={24} color="#FFC107" />
+            <Text style={styles.actionButtonText}>রিপোর্ট</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('ProductManagement')}
+          >
+            <Ionicons name="settings" size={24} color="#9C27B0" />
+            <Text style={styles.actionButtonText}>পণ্য সেটিংস</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+      
+      {/* Low Stock Alert */}
+      {lowStockItems && lowStockItems.length > 0 && (
+        <View style={styles.alertContainer}>
+          <Text style={styles.sectionTitle}>কম স্টক সতর্কতা</Text>
+          <View style={styles.alertBox}>
+            <Ionicons name="warning" size={24} color="#F44336" style={styles.alertIcon} />
+            <View style={styles.alertTextContainer}>
+              <Text style={styles.alertTitle}>
+                {lowStockItems.length}টি পণ্যের স্টক কম
+              </Text>
+              <Text style={styles.alertText}>
+                অনুগ্রহ করে স্টক আপডেট করুন
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.alertButton}
+              onPress={() => navigation.navigate('StockManagement')}
+            >
+              <Text style={styles.alertButtonText}>দেখুন</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+      
+      {/* Recent Sales */}
+      <View style={styles.recentSalesContainer}>
+        <Text style={styles.sectionTitle}>সাম্প্রতিক বিক্রয়</Text>
+        {recentSales && recentSales.length > 0 ? (
+          recentSales.map((sale, index) => (
+            <View key={index} style={styles.saleCard}>
+              <View style={styles.saleHeader}>
+                <Text style={styles.saleCustomer}>{sale.customerName}</Text>
+                <Text style={styles.saleDate}>{new Date(sale.date).toLocaleDateString('bn-BD')}</Text>
+              </View>
+              <View style={styles.saleDetails}>
+                <View style={styles.saleItemCount}>
+                  <Text style={styles.saleItemCountText}>{sale.items.length}টি আইটেম</Text>
+                </View>
+                <Text style={styles.saleAmount}>{sale.finalAmount.toLocaleString('bn-BD')} ৳</Text>
+              </View>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.emptyText}>কোনো বিক্রয় নেই</Text>
+        )}
+      </View>
+      
+      {/* Cart Button */}
+      <TouchableOpacity
+        style={styles.cartButton}
+        onPress={() => navigation.navigate('Cart')}
+      >
+        <Ionicons name="cart" size={24} color="#FFFFFF" />
+        {cartItems && cartItems.length > 0 && (
+          <View style={styles.cartBadge}>
+            <Text style={styles.cartBadgeText}>{cartItems.length}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F5F5F5',
   },
   header: {
     flexDirection: 'row',
+    backgroundColor: '#4CAF50',
+    padding: 20,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+  headerImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: 15,
   },
-  cartIconContainer: {
-    position: 'relative',
-  },
-  cartBadge: {
-    position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: '#f44336',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cartBadgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  welcomeContainer: {
-    padding: 16,
-    backgroundColor: '#2196f3',
+  headerTextContainer: {
+    flex: 1,
   },
   welcomeText: {
-    fontSize: 14,
-    color: '#e3f2fd',
-  },
-  businessName: {
+    color: 'white',
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 4,
+  },
+  businessText: {
+    color: 'white',
+    fontSize: 16,
+    opacity: 0.9,
   },
   statsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 8,
-    backgroundColor: '#fff',
-    marginBottom: 12,
+    justifyContent: 'space-between',
+    padding: 15,
+    marginTop: -20,
   },
-  statCard: {
-    width: '50%',
-    padding: 8,
+  statsCard: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 15,
+    width: '48%',
+    marginBottom: 15,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
   },
-  statIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  statValue: {
-    fontSize: 18,
+  statsValue: {
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
+    marginBottom: 5,
   },
-  statLabel: {
+  statsLabel: {
     fontSize: 14,
-    color: '#757575',
-  },
-  quickActionsContainer: {
-    backgroundColor: '#fff',
-    padding: 16,
-    marginBottom: 12,
+    color: '#666',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 12,
+    marginBottom: 15,
     color: '#333',
   },
-  quickActions: {
+  actionButtonsContainer: {
+    padding: 15,
+  },
+  actionButtons: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
   },
   actionButton: {
-    width: '30%',
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 15,
+    width: '48%',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 15,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
   },
-  actionIconContainer: {
+  actionButtonText: {
+    marginTop: 10,
+    color: '#555',
+    fontWeight: '500',
+  },
+  alertContainer: {
+    padding: 15,
+  },
+  alertBox: {
+    flexDirection: 'row',
+    backgroundColor: '#FFEBEE',
+    borderRadius: 8,
+    padding: 15,
+    alignItems: 'center',
+    borderLeftWidth: 4,
+    borderLeftColor: '#F44336',
+  },
+  alertIcon: {
+    marginRight: 15,
+  },
+  alertTextContainer: {
+    flex: 1,
+  },
+  alertTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#D32F2F',
+  },
+  alertText: {
+    color: '#777',
+    marginTop: 3,
+  },
+  alertButton: {
+    backgroundColor: '#F44336',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 4,
+  },
+  alertButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  recentSalesContainer: {
+    padding: 15,
+    paddingBottom: 80,
+  },
+  saleCard: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+  },
+  saleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  saleCustomer: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+  },
+  saleDate: {
+    color: '#777',
+  },
+  saleDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  saleItemCount: {
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 4,
+  },
+  saleItemCountText: {
+    color: '#388E3C',
+    fontSize: 12,
+  },
+  saleAmount: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#777',
+    fontStyle: 'italic',
+    padding: 20,
+  },
+  cartButton: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    backgroundColor: '#4CAF50',
     width: 56,
     height: 56,
     borderRadius: 28,
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
-  actionText: {
-    fontSize: 12,
-    textAlign: 'center',
-    color: '#333',
-  },
-  recentTransactionsContainer: {
-    backgroundColor: '#fff',
-    padding: 16,
-  },
-  transactionCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  transactionLeft: {
-    flex: 1,
-  },
-  transactionDate: {
-    fontSize: 14,
-    color: '#757575',
-  },
-  transactionCustomer: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginVertical: 2,
-  },
-  transactionItems: {
-    fontSize: 14,
-    color: '#757575',
-  },
-  transactionRight: {
-    justifyContent: 'center',
-  },
-  transactionAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2196f3',
-  },
-  noTransactionsContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  noTransactionsText: {
-    fontSize: 16,
-    color: '#757575',
-    marginTop: 8,
-  },
-  spacer: {
+  cartBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: '#FF5722',
+    width: 20,
     height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cartBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });
 

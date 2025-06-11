@@ -10,7 +10,6 @@ import {
   Alert,
   Image,
   ActivityIndicator,
-  SafeAreaView,
 } from 'react-native';
 import { AntDesign, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -234,412 +233,406 @@ const ProductSelectionScreen = () => {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container}>
-        <View style={styles.header}>
+    <ScrollView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color="#000" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>পণ্য নির্বাচন করুন</Text>
+      </View>
+      
+      <View style={styles.selectionContainer}>
+        {/* Category Selection */}
+        <View style={styles.selectionRow}>
+          <Text style={styles.selectionLabel}>ক্যাটাগরি:</Text>
           <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
+            style={styles.selectionButton}
+            onPress={() => setCategoryModalVisible(true)}
           >
-            <Ionicons name="arrow-back" size={24} color="#000" />
+            <Text style={styles.selectionText}>
+              {selectedCategory ? selectedCategory.name : "ক্যাটাগরি নির্বাচন করুন"}
+            </Text>
+            <AntDesign name="down" size={16} color="#666" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>পণ্য নির্বাচন করুন</Text>
         </View>
         
-        <View style={styles.selectionContainer}>
-          {/* Category Selection */}
+        {/* Company Selection - Only show if category is selected */}
+        {selectedCategory && Array.isArray(selectedCategory.companies) && selectedCategory.companies.length > 0 && (
           <View style={styles.selectionRow}>
-            <Text style={styles.selectionLabel}>ক্যাটাগরি:</Text>
+            <Text style={styles.selectionLabel}>কোম্পানি:</Text>
             <TouchableOpacity
               style={styles.selectionButton}
-              onPress={() => setCategoryModalVisible(true)}
+              onPress={() => setCompanyModalVisible(true)}
             >
               <Text style={styles.selectionText}>
-                {selectedCategory ? selectedCategory.name : "ক্যাটাগরি নির্বাচন করুন"}
+                {selectedCompany ? selectedCompany.name : "কোম্পানি নির্বাচন করুন"}
               </Text>
               <AntDesign name="down" size={16} color="#666" />
             </TouchableOpacity>
           </View>
-          
-          {/* Company Selection - Only show if category is selected */}
-          {selectedCategory && Array.isArray(selectedCategory.companies) && selectedCategory.companies.length > 0 && (
-            <View style={styles.selectionRow}>
-              <Text style={styles.selectionLabel}>কোম্পানি:</Text>
-              <TouchableOpacity
-                style={styles.selectionButton}
-                onPress={() => setCompanyModalVisible(true)}
-              >
-                <Text style={styles.selectionText}>
-                  {selectedCompany ? selectedCompany.name : "কোম্পানি নির্বাচন করুন"}
-                </Text>
-                <AntDesign name="down" size={16} color="#666" />
-              </TouchableOpacity>
-            </View>
-          )}
-          
-          {/* Product Type Selection - Only show if company is selected */}
-          {selectedCompany && Array.isArray(selectedCompany.productTypes) && selectedCompany.productTypes.length > 0 && (
-            <View style={styles.selectionRow}>
-              <Text style={styles.selectionLabel}>প্রোডাক্ট টাইপ:</Text>
-              <TouchableOpacity
-                style={styles.selectionButton}
-                onPress={() => setProductTypeModalVisible(true)}
-              >
-                <Text style={styles.selectionText}>
-                  {selectedProductType ? selectedProductType.name : "প্রোডাক্ট টাইপ নির্বাচন করুন"}
-                </Text>
-                <AntDesign name="down" size={16} color="#666" />
-              </TouchableOpacity>
-            </View>
-          )}
-          
-          {/* Color Selection - Only show if product type has colors */}
-          {selectedProductType && selectedProductType.hasColors && (
-            <View style={styles.selectionRow}>
-              <Text style={styles.selectionLabel}>কালার:</Text>
-              <TouchableOpacity
-                style={styles.selectionButton}
-                onPress={() => setColorModalVisible(true)}
-              >
-                <Text style={styles.selectionText}>
-                  {selectedColor || "কালার নির্বাচন করুন"}
-                </Text>
-                <AntDesign name="down" size={16} color="#666" />
-              </TouchableOpacity>
-            </View>
-          )}
-          
-          {/* Thickness Selection */}
-          {selectedProductType && (
-            <View style={styles.selectionRow}>
-              <Text style={styles.selectionLabel}>পুরুত্ব:</Text>
-              <TouchableOpacity
-                style={styles.selectionButton}
-                onPress={() => setThicknessModalVisible(true)}
-              >
-                <Text style={styles.selectionText}>
-                  {selectedThickness || "পুরুত্ব নির্বাচন করুন"}
-                </Text>
-                <AntDesign name="down" size={16} color="#666" />
-              </TouchableOpacity>
-            </View>
-          )}
-          
-          {/* Size Selection */}
-          {selectedProductType && (
-            <View style={styles.selectionRow}>
-              <Text style={styles.selectionLabel}>সাইজ:</Text>
-              <TouchableOpacity
-                style={styles.selectionButton}
-                onPress={() => setSizeModalVisible(true)}
-              >
-                <Text style={styles.selectionText}>
-                  {selectedSize || "সাইজ নির্বাচন করুন"}
-                </Text>
-                <AntDesign name="down" size={16} color="#666" />
-              </TouchableOpacity>
-            </View>
-          )}
-          
-          {/* Quantity Input */}
-          <View style={styles.selectionRow}>
-            <Text style={styles.selectionLabel}>পরিমাণ:</Text>
-            <View style={styles.quantityContainer}>
-              <TouchableOpacity
-                style={styles.quantityButton}
-                onPress={() => {
-                  const current = parseInt(quantity);
-                  if (current > 1) {
-                    setQuantity((current - 1).toString());
-                  }
-                }}
-              >
-                <AntDesign name="minus" size={18} color="#fff" />
-              </TouchableOpacity>
-              
-              <TextInput
-                style={styles.quantityInput}
-                value={quantity}
-                onChangeText={setQuantity}
-                keyboardType="numeric"
-              />
-              
-              <TouchableOpacity
-                style={styles.quantityButton}
-                onPress={() => {
-                  const current = parseInt(quantity);
-                  setQuantity((current + 1).toString());
-                }}
-              >
-                <AntDesign name="plus" size={18} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          </View>
-          
-          {/* Add Product Button */}
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={addProductEntry}
-          >
-            <Text style={styles.addButtonText}>পণ্য যোগ করুন</Text>
-            <AntDesign name="plus" size={18} color="#fff" />
-          </TouchableOpacity>
-        </View>
+        )}
         
-        {/* Selected Products List */}
-        {productEntries.length > 0 && (
-          <View style={styles.selectedProductsContainer}>
-            <Text style={styles.selectedProductsTitle}>নির্বাচিত পণ্য</Text>
-            
-            {productEntries.map((entry, index) => (
-              <View key={index} style={styles.selectedProductItem}>
-                <View style={styles.selectedProductInfo}>
-                  <Text style={styles.selectedProductCategory}>
-                    {entry.category?.name}
-                  </Text>
-                  <Text style={styles.selectedProductDetails}>
-                    {entry.company?.name && `${entry.company.name}, `}
-                    {entry.productType?.name && `${entry.productType.name}, `}
-                    {entry.color && `${entry.color}, `}
-                    {entry.thickness} মিমি, {entry.size}
-                  </Text>
-                  <Text style={styles.selectedProductQuantity}>
-                    পরিমাণ: {entry.quantity}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.removeButton}
-                  onPress={() => removeProductEntry(index)}
-                >
-                  <AntDesign name="close" size={20} color="#fff" />
-                </TouchableOpacity>
-              </View>
-            ))}
-            
+        {/* Product Type Selection - Only show if company is selected */}
+        {selectedCompany && Array.isArray(selectedCompany.productTypes) && selectedCompany.productTypes.length > 0 && (
+          <View style={styles.selectionRow}>
+            <Text style={styles.selectionLabel}>প্রোডাক্ট টাইপ:</Text>
             <TouchableOpacity
-              style={styles.addToCartButton}
-              onPress={addAllToCart}
+              style={styles.selectionButton}
+              onPress={() => setProductTypeModalVisible(true)}
             >
-              <Text style={styles.addToCartButtonText}>কার্টে যোগ করুন</Text>
-              <MaterialIcons name="shopping-cart" size={20} color="#fff" />
+              <Text style={styles.selectionText}>
+                {selectedProductType ? selectedProductType.name : "প্রোডাক্ট টাইপ নির্বাচন করুন"}
+              </Text>
+              <AntDesign name="down" size={16} color="#666" />
             </TouchableOpacity>
           </View>
         )}
         
-        {/* Category Selection Modal */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={categoryModalVisible}
-          onRequestClose={() => setCategoryModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>ক্যাটাগরি নির্বাচন করুন</Text>
-              <ScrollView>
-                {Array.isArray(categories) && categories.map((category) => (
-                  <TouchableOpacity
-                    key={category.id}
-                    style={styles.modalItem}
-                    onPress={() => {
-                      setSelectedCategory(category);
-                      setCategoryModalVisible(false);
-                    }}
-                  >
-                    <Text style={styles.modalItemText}>{category.name}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              <TouchableOpacity
-                style={styles.closeModalButton}
-                onPress={() => setCategoryModalVisible(false)}
-              >
-                <Text style={styles.closeModalButtonText}>বাতিল</Text>
-              </TouchableOpacity>
-            </View>
+        {/* Color Selection - Only show if product type has colors */}
+        {selectedProductType && selectedProductType.hasColors && (
+          <View style={styles.selectionRow}>
+            <Text style={styles.selectionLabel}>কালার:</Text>
+            <TouchableOpacity
+              style={styles.selectionButton}
+              onPress={() => setColorModalVisible(true)}
+            >
+              <Text style={styles.selectionText}>
+                {selectedColor || "কালার নির্বাচন করুন"}
+              </Text>
+              <AntDesign name="down" size={16} color="#666" />
+            </TouchableOpacity>
           </View>
-        </Modal>
+        )}
         
-        {/* Company Selection Modal */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={companyModalVisible}
-          onRequestClose={() => setCompanyModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>কোম্পানি নির্বাচন করুন</Text>
-              <ScrollView>
-                {selectedCategory && Array.isArray(selectedCategory.companies) && selectedCategory.companies.map((company) => (
-                  <TouchableOpacity
-                    key={company.id}
-                    style={styles.modalItem}
-                    onPress={() => {
-                      setSelectedCompany(company);
-                      setCompanyModalVisible(false);
-                    }}
-                  >
-                    <Text style={styles.modalItemText}>{company.name}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              <TouchableOpacity
-                style={styles.closeModalButton}
-                onPress={() => setCompanyModalVisible(false)}
-              >
-                <Text style={styles.closeModalButtonText}>বাতিল</Text>
-              </TouchableOpacity>
-            </View>
+        {/* Thickness Selection */}
+        {selectedProductType && (
+          <View style={styles.selectionRow}>
+            <Text style={styles.selectionLabel}>পুরুত্ব:</Text>
+            <TouchableOpacity
+              style={styles.selectionButton}
+              onPress={() => setThicknessModalVisible(true)}
+            >
+              <Text style={styles.selectionText}>
+                {selectedThickness || "পুরুত্ব নির্বাচন করুন"}
+              </Text>
+              <AntDesign name="down" size={16} color="#666" />
+            </TouchableOpacity>
           </View>
-        </Modal>
+        )}
         
-        {/* Product Type Selection Modal */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={productTypeModalVisible}
-          onRequestClose={() => setProductTypeModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>প্রোডাক্ট টাইপ নির্বাচন করুন</Text>
-              <ScrollView>
-                {selectedCompany && Array.isArray(selectedCompany.productTypes) && selectedCompany.productTypes.map((type) => (
-                  <TouchableOpacity
-                    key={type.id}
-                    style={styles.modalItem}
-                    onPress={() => {
-                      setSelectedProductType(type);
-                      setProductTypeModalVisible(false);
-                    }}
-                  >
-                    <Text style={styles.modalItemText}>{type.name}</Text>
-                    {type.hasColors && <Text style={styles.modalItemSubtext}>(কালার অপশন আছে)</Text>}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              <TouchableOpacity
-                style={styles.closeModalButton}
-                onPress={() => setProductTypeModalVisible(false)}
-              >
-                <Text style={styles.closeModalButtonText}>বাতিল</Text>
-              </TouchableOpacity>
-            </View>
+        {/* Size Selection */}
+        {selectedProductType && (
+          <View style={styles.selectionRow}>
+            <Text style={styles.selectionLabel}>সাইজ:</Text>
+            <TouchableOpacity
+              style={styles.selectionButton}
+              onPress={() => setSizeModalVisible(true)}
+            >
+              <Text style={styles.selectionText}>
+                {selectedSize || "সাইজ নির্বাচন করুন"}
+              </Text>
+              <AntDesign name="down" size={16} color="#666" />
+            </TouchableOpacity>
           </View>
-        </Modal>
+        )}
         
-        {/* Color Selection Modal */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={colorModalVisible}
-          onRequestClose={() => setColorModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>কালার নির্বাচন করুন</Text>
-              <ScrollView>
-                {selectedProductType && selectedProductType.colors && selectedProductType.colors.map((color, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.modalItem}
-                    onPress={() => {
-                      setSelectedColor(color);
-                      setColorModalVisible(false);
-                    }}
-                  >
-                    <Text style={styles.modalItemText}>{color}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              <TouchableOpacity
-                style={styles.closeModalButton}
-                onPress={() => setColorModalVisible(false)}
-              >
-                <Text style={styles.closeModalButtonText}>বাতিল</Text>
-              </TouchableOpacity>
-            </View>
+        {/* Quantity Input */}
+        <View style={styles.selectionRow}>
+          <Text style={styles.selectionLabel}>পরিমাণ:</Text>
+          <View style={styles.quantityContainer}>
+            <TouchableOpacity
+              style={styles.quantityButton}
+              onPress={() => {
+                const current = parseInt(quantity);
+                if (current > 1) {
+                  setQuantity((current - 1).toString());
+                }
+              }}
+            >
+              <AntDesign name="minus" size={18} color="#fff" />
+            </TouchableOpacity>
+            
+            <TextInput
+              style={styles.quantityInput}
+              value={quantity}
+              onChangeText={setQuantity}
+              keyboardType="numeric"
+            />
+            
+            <TouchableOpacity
+              style={styles.quantityButton}
+              onPress={() => {
+                const current = parseInt(quantity);
+                setQuantity((current + 1).toString());
+              }}
+            >
+              <AntDesign name="plus" size={18} color="#fff" />
+            </TouchableOpacity>
           </View>
-        </Modal>
+        </View>
         
-        {/* Thickness Selection Modal */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={thicknessModalVisible}
-          onRequestClose={() => setThicknessModalVisible(false)}
+        {/* Add Product Button */}
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={addProductEntry}
         >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>পুরুত্ব নির্বাচন করুন</Text>
-              <ScrollView>
-                {getThicknessOptions().map((thickness, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.modalItem}
-                    onPress={() => {
-                      setSelectedThickness(thickness);
-                      setThicknessModalVisible(false);
-                    }}
-                  >
-                    <Text style={styles.modalItemText}>{thickness} মিমি</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+          <Text style={styles.addButtonText}>পণ্য যোগ করুন</Text>
+          <AntDesign name="plus" size={18} color="#fff" />
+        </TouchableOpacity>
+      </View>
+      
+      {/* Selected Products List */}
+      {productEntries.length > 0 && (
+        <View style={styles.selectedProductsContainer}>
+          <Text style={styles.selectedProductsTitle}>নির্বাচিত পণ্য</Text>
+          
+          {productEntries.map((entry, index) => (
+            <View key={index} style={styles.selectedProductItem}>
+              <View style={styles.selectedProductInfo}>
+                <Text style={styles.selectedProductCategory}>
+                  {entry.category?.name}
+                </Text>
+                <Text style={styles.selectedProductDetails}>
+                  {entry.company?.name && `${entry.company.name}, `}
+                  {entry.productType?.name && `${entry.productType.name}, `}
+                  {entry.color && `${entry.color}, `}
+                  {entry.thickness} মিমি, {entry.size}
+                </Text>
+                <Text style={styles.selectedProductQuantity}>
+                  পরিমাণ: {entry.quantity}
+                </Text>
+              </View>
               <TouchableOpacity
-                style={styles.closeModalButton}
-                onPress={() => setThicknessModalVisible(false)}
+                style={styles.removeButton}
+                onPress={() => removeProductEntry(index)}
               >
-                <Text style={styles.closeModalButtonText}>বাতিল</Text>
+                <AntDesign name="close" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
+          ))}
+          
+          <TouchableOpacity
+            style={styles.addToCartButton}
+            onPress={addAllToCart}
+          >
+            <Text style={styles.addToCartButtonText}>কার্টে যোগ করুন</Text>
+            <MaterialIcons name="shopping-cart" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
+      
+      {/* Category Selection Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={categoryModalVisible}
+        onRequestClose={() => setCategoryModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>ক্যাটাগরি নির্বাচন করুন</Text>
+            <ScrollView>
+              {Array.isArray(categories) && categories.map((category) => (
+                <TouchableOpacity
+                  key={category.id}
+                  style={styles.modalItem}
+                  onPress={() => {
+                    setSelectedCategory(category);
+                    setCategoryModalVisible(false);
+                  }}
+                >
+                  <Text style={styles.modalItemText}>{category.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.closeModalButton}
+              onPress={() => setCategoryModalVisible(false)}
+            >
+              <Text style={styles.closeModalButtonText}>বাতিল</Text>
+            </TouchableOpacity>
           </View>
-        </Modal>
-        
-        {/* Size Selection Modal */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={sizeModalVisible}
-          onRequestClose={() => setSizeModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>সাইজ নির্বাচন করুন</Text>
-              <ScrollView>
-                {getSizeOptions().map((size, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.modalItem}
-                    onPress={() => {
-                      setSelectedSize(size);
-                      setSizeModalVisible(false);
-                    }}
-                  >
-                    <Text style={styles.modalItemText}>{size}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              <TouchableOpacity
-                style={styles.closeModalButton}
-                onPress={() => setSizeModalVisible(false)}
-              >
-                <Text style={styles.closeModalButtonText}>বাতিল</Text>
-              </TouchableOpacity>
-            </View>
+        </View>
+      </Modal>
+      
+      {/* Company Selection Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={companyModalVisible}
+        onRequestClose={() => setCompanyModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>কোম্পানি নির্বাচন করুন</Text>
+            <ScrollView>
+              {selectedCategory && Array.isArray(selectedCategory.companies) && selectedCategory.companies.map((company) => (
+                <TouchableOpacity
+                  key={company.id}
+                  style={styles.modalItem}
+                  onPress={() => {
+                    setSelectedCompany(company);
+                    setCompanyModalVisible(false);
+                  }}
+                >
+                  <Text style={styles.modalItemText}>{company.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.closeModalButton}
+              onPress={() => setCompanyModalVisible(false)}
+            >
+              <Text style={styles.closeModalButtonText}>বাতিল</Text>
+            </TouchableOpacity>
           </View>
-        </Modal>
-      </ScrollView>
-    </SafeAreaView>
+        </View>
+      </Modal>
+      
+      {/* Product Type Selection Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={productTypeModalVisible}
+        onRequestClose={() => setProductTypeModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>প্রোডাক্ট টাইপ নির্বাচন করুন</Text>
+            <ScrollView>
+              {selectedCompany && Array.isArray(selectedCompany.productTypes) && selectedCompany.productTypes.map((type) => (
+                <TouchableOpacity
+                  key={type.id}
+                  style={styles.modalItem}
+                  onPress={() => {
+                    setSelectedProductType(type);
+                    setProductTypeModalVisible(false);
+                  }}
+                >
+                  <Text style={styles.modalItemText}>{type.name}</Text>
+                  {type.hasColors && <Text style={styles.modalItemSubtext}>(কালার অপশন আছে)</Text>}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.closeModalButton}
+              onPress={() => setProductTypeModalVisible(false)}
+            >
+              <Text style={styles.closeModalButtonText}>বাতিল</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      
+      {/* Color Selection Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={colorModalVisible}
+        onRequestClose={() => setColorModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>কালার নির্বাচন করুন</Text>
+            <ScrollView>
+              {selectedProductType && selectedProductType.colors && selectedProductType.colors.map((color, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.modalItem}
+                  onPress={() => {
+                    setSelectedColor(color);
+                    setColorModalVisible(false);
+                  }}
+                >
+                  <Text style={styles.modalItemText}>{color}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.closeModalButton}
+              onPress={() => setColorModalVisible(false)}
+            >
+              <Text style={styles.closeModalButtonText}>বাতিল</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      
+      {/* Thickness Selection Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={thicknessModalVisible}
+        onRequestClose={() => setThicknessModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>পুরুত্ব নির্বাচন করুন</Text>
+            <ScrollView>
+              {getThicknessOptions().map((thickness, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.modalItem}
+                  onPress={() => {
+                    setSelectedThickness(thickness);
+                    setThicknessModalVisible(false);
+                  }}
+                >
+                  <Text style={styles.modalItemText}>{thickness} মিমি</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.closeModalButton}
+              onPress={() => setThicknessModalVisible(false)}
+            >
+              <Text style={styles.closeModalButtonText}>বাতিল</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      
+      {/* Size Selection Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={sizeModalVisible}
+        onRequestClose={() => setSizeModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>সাইজ নির্বাচন করুন</Text>
+            <ScrollView>
+              {getSizeOptions().map((size, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.modalItem}
+                  onPress={() => {
+                    setSelectedSize(size);
+                    setSizeModalVisible(false);
+                  }}
+                >
+                  <Text style={styles.modalItemText}>{size}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.closeModalButton}
+              onPress={() => setSizeModalVisible(false)}
+            >
+              <Text style={styles.closeModalButtonText}>বাতিল</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
   container: {
     flex: 1,
     backgroundColor: '#f8f8f8',

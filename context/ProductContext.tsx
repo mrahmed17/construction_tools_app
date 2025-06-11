@@ -1,580 +1,237 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
+import { 
+  Product, 
+  Category, 
+  Company, 
+  ProductType,
+  DEFAULT_CATEGORIES,
+  DEFAULT_THICKNESSES,
+  TIN_SIZES,
+  TUA_SIZES
+} from '../types';
 
-// Product Category Types
-export interface Product {
-  id: string;
-  category: string;
-  company?: string;
-  type?: string;
-  color?: string;
-  thickness: string;
-  size: string;
-  purchasePrice: number;
-  salePrice: number;
-  stock: number;
-  photoUri?: string;
-  lowStockThreshold?: number;
-}
-
-export interface Category {
-  id: string;
-  name: string;
-  companies: Company[];
-}
-
-export interface Company {
-  id: string;
-  name: string;
-  productTypes: ProductType[];
-}
-
-export interface ProductType {
-  id: string;
-  name: string;
-  hasColors: boolean;
-  colors?: string[];
-  thicknessRange?: {
-    min: number;
-    max: number;
-    step: number;
-    unit: string;
-  };
-  thicknessOptions?: string[];
-  sizeRange?: {
-    min: number;
-    max: number;
-    unit: string;
-  };
-}
-
-// Default Categories based on requirements
-const DEFAULT_CATEGORIES: Category[] = [
-  {
-    id: '1',
-    name: 'টিন',
-    companies: [
-      {
-        id: '1',
-        name: 'PHP',
-        productTypes: [
-          {
-            id: '1',
-            name: 'সুপার',
-            hasColors: false,
-            thicknessRange: {
-              min: 0.120,
-              max: 0.510,
-              step: 0.010,
-              unit: 'মিমি'
-            },
-            sizeRange: {
-              min: 6,
-              max: 12,
-              unit: 'ফুট'
-            }
-          },
-          {
-            id: '2',
-            name: 'লুম',
-            hasColors: false,
-            thicknessRange: {
-              min: 0.120,
-              max: 0.510,
-              step: 0.010,
-              unit: 'মিমি'
-            },
-            sizeRange: {
-              min: 6,
-              max: 12,
-              unit: 'ফুট'
-            }
-          },
-          {
-            id: '3',
-            name: 'কালার',
-            hasColors: true,
-            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
-            thicknessRange: {
-              min: 0.120,
-              max: 0.510,
-              step: 0.010,
-              unit: 'মিমি'
-            },
-            sizeRange: {
-              min: 6,
-              max: 12,
-              unit: 'ফুট'
-            }
-          }
-        ]
-      },
-      {
-        id: '2',
-        name: 'KY',
-        productTypes: [
-          {
-            id: '1',
-            name: 'NOF',
-            hasColors: false,
-            thicknessRange: {
-              min: 0.120,
-              max: 0.510,
-              step: 0.010,
-              unit: 'মিমি'
-            },
-            sizeRange: {
-              min: 6,
-              max: 12,
-              unit: 'ফুট'
-            }
-          },
-          {
-            id: '2',
-            name: 'লুম',
-            hasColors: false,
-            thicknessRange: {
-              min: 0.120,
-              max: 0.510,
-              step: 0.010,
-              unit: 'মিমি'
-            },
-            sizeRange: {
-              min: 6,
-              max: 12,
-              unit: 'ফুট'
-            }
-          },
-          {
-            id: '3',
-            name: 'কালার',
-            hasColors: true,
-            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
-            thicknessRange: {
-              min: 0.120,
-              max: 0.510,
-              step: 0.010,
-              unit: 'মিমি'
-            },
-            sizeRange: {
-              min: 6,
-              max: 12,
-              unit: 'ফুট'
-            }
-          }
-        ]
-      },
-      {
-        id: '3',
-        name: 'TK (G)',
-        productTypes: [
-          {
-            id: '1',
-            name: 'কালার',
-            hasColors: true,
-            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
-            thicknessRange: {
-              min: 0.120,
-              max: 0.510,
-              step: 0.010,
-              unit: 'মিমি'
-            },
-            sizeRange: {
-              min: 6,
-              max: 12,
-              unit: 'ফুট'
-            }
-          }
-        ]
-      },
-      {
-        id: '4',
-        name: 'ABUL Khair',
-        productTypes: [
-          {
-            id: '1',
-            name: 'কালার',
-            hasColors: true,
-            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
-            thicknessRange: {
-              min: 0.12,
-              max: 0.46,
-              step: 0.01,
-              unit: 'মিমি'
-            },
-            sizeRange: {
-              min: 6,
-              max: 12,
-              unit: 'ফুট'
-            }
-          }
-        ]
-      },
-      {
-        id: '5',
-        name: 'Jalalabad',
-        productTypes: [
-          {
-            id: '1',
-            name: 'কালার',
-            hasColors: true,
-            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
-            thicknessOptions: ['0.25', '0.35', '0.38', '0.42', '0.46', '0.48', '0.52', '0.54', '0.58', '0.62', '0.64', '0.72'],
-            sizeRange: {
-              min: 6,
-              max: 12,
-              unit: 'ফুট'
-            }
-          }
-        ]
-      },
-      {
-        id: '6',
-        name: 'Gelco Steel',
-        productTypes: [
-          {
-            id: '1',
-            name: 'কালার',
-            hasColors: true,
-            colors: ['CNG (ডার্ক গ্রীন)', 'ব্লু', 'রেড'],
-            thicknessRange: {
-              min: 0.12,
-              max: 0.46,
-              step: 0.01,
-              unit: 'মিমি'
-            },
-            sizeRange: {
-              min: 6,
-              max: 12,
-              unit: 'ফুট'
-            }
-          }
-        ]
-      }
-    ]
-  },
-  {
-    id: '2',
-    name: 'টুয়া',
-    companies: [
-      {
-        id: '1',
-        name: 'PHP',
-        productTypes: [
-          {
-            id: '1',
-            name: 'সুপার',
-            hasColors: false,
-            thicknessRange: {
-              min: 0.120,
-              max: 0.510,
-              step: 0.010,
-              unit: 'মিমি'
-            },
-            sizeRange: {
-              min: 6,
-              max: 10,
-              unit: 'ফুট'
-            }
-          }
-        ]
-      }
-    ]
-  },
-  {
-    id: '3',
-    name: 'প্লেইন শিট',
-    companies: [
-      {
-        id: '1',
-        name: 'PHP',
-        productTypes: [
-          {
-            id: '1',
-            name: 'সুপার',
-            hasColors: false,
-            thicknessRange: {
-              min: 0.120,
-              max: 0.510,
-              step: 0.010,
-              unit: 'মিমি'
-            },
-            sizeRange: {
-              min: 6,
-              max: 10,
-              unit: 'ফুট'
-            }
-          }
-        ]
-      }
-    ]
-  },
-  {
-    id: '4',
-    name: 'ফুলের শিট',
-    companies: [],
-    productTypes: [
-      {
-        id: '1',
-        name: 'প্রিন্টের শিট',
-        hasColors: true,
-        colors: ['ফুল প্যাটার্ন ১', 'ফুল প্যাটার্ন ২', 'ফুল প্যাটার্ন ৩'],
-        thicknessRange: {
-          min: 0.120,
-          max: 0.510,
-          step: 0.010,
-          unit: 'মিমি'
-        },
-        sizeRange: {
-          min: 6,
-          max: 10,
-          unit: 'ফুট'
-        }
-      }
-    ]
-  },
-  {
-    id: '5',
-    name: 'প্লাস্টিকের টিন',
-    companies: [
-      {
-        id: '1',
-        name: 'RFL',
-        productTypes: [
-          {
-            id: '1',
-            name: 'প্লাস্টিক টিন',
-            hasColors: true,
-            colors: ['সাদা', 'লাল', 'নীল'],
-            thicknessRange: {
-              min: 0.75,
-              max: 1.75,
-              step: 0.25,
-              unit: 'মিমি'
-            },
-            sizeRange: {
-              min: 6,
-              max: 12,
-              unit: 'ফুট'
-            }
-          }
-        ]
-      }
-    ]
-  }
-];
-
-export interface ProductContextType {
-  categories: Category[];
+interface ProductContextType {
   products: Product[];
-  addCategory: (name: string) => void;
-  addCompany: (categoryId: string, companyName: string) => void;
-  addProductType: (categoryId: string, companyId: string, productType: Partial<ProductType>) => void;
-  addProduct: (product: Partial<Product>) => void;
-  updateProduct: (productId: string, updates: Partial<Product>) => void;
-  deleteProduct: (productId: string) => void;
-  saveProductImage: (productId: string, imageUri: string) => Promise<void>;
+  categories: Category[];
+  addProduct: (product: Product) => Promise<void>;
+  updateProduct: (product: Product) => Promise<void>;
+  deleteProduct: (productId: string) => Promise<void>;
+  getProductsByCategory: (categoryId: string) => Product[];
   getLowStockProducts: () => Product[];
-  loading: boolean;
+  addCategory: (category: Category) => Promise<void>;
+  updateCategory: (category: Category) => Promise<void>;
+  deleteCategory: (categoryId: string) => Promise<void>;
+  addCompany: (categoryId: string, company: Company) => Promise<void>;
+  updateCompany: (categoryId: string, company: Company) => Promise<void>;
+  deleteCompany: (categoryId: string, companyId: string) => Promise<void>;
+  addProductType: (categoryId: string, companyId: string, productType: ProductType) => Promise<void>;
+  getThicknessByCompany: (companyName: string) => string[];
+  getSizeByCategory: (categoryName: string) => string[];
 }
 
-export const ProductContext = createContext<ProductContextType | undefined>(undefined);
-
-export const useProducts = () => {
-  const context = useContext(ProductContext);
-  if (!context) {
-    throw new Error('useProducts must be used within a ProductProvider');
-  }
-  return context;
-};
+const ProductContext = createContext<ProductContextType | undefined>(undefined);
 
 export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<Category[]>([]);
 
-  // Load data from AsyncStorage on mount
   useEffect(() => {
+    // Initialize from AsyncStorage
     const loadData = async () => {
       try {
-        setLoading(true);
-        
+        // Load products
+        const productsData = await AsyncStorage.getItem('products');
+        if (productsData) {
+          setProducts(JSON.parse(productsData));
+        }
+
         // Load categories
-        const storedCategories = await AsyncStorage.getItem('categories');
-        if (storedCategories) {
-          setCategories(JSON.parse(storedCategories));
+        const categoriesData = await AsyncStorage.getItem('categories');
+        if (categoriesData) {
+          setCategories(JSON.parse(categoriesData));
         } else {
-          // Set default categories if none exist
+          // Initialize with default categories
           setCategories(DEFAULT_CATEGORIES);
           await AsyncStorage.setItem('categories', JSON.stringify(DEFAULT_CATEGORIES));
         }
-        
-        // Load products
-        const storedProducts = await AsyncStorage.getItem('products');
-        if (storedProducts) {
-          setProducts(JSON.parse(storedProducts));
-        }
       } catch (error) {
-        console.error('Error loading data:', error);
-        Alert.alert('ত্রুটি', 'ডাটা লোড করতে সমস্যা হয়েছে। দয়া করে আবার চেষ্টা করুন।');
-        
-        // Set default values in case of error
-        setCategories(DEFAULT_CATEGORIES);
-      } finally {
-        setLoading(false);
+        console.error('Error loading data from storage:', error);
+        Alert.alert('ডাটা লোড করতে সমস্যা হচ্ছে', 'অ্যাপ্লিকেশন পুনরায় চালু করুন।');
       }
     };
-    
+
     loadData();
   }, []);
-  
-  // Save categories to AsyncStorage whenever they change
-  useEffect(() => {
-    const saveCategories = async () => {
-      try {
-        if (categories && categories.length > 0) {
-          await AsyncStorage.setItem('categories', JSON.stringify(categories));
-        }
-      } catch (error) {
-        console.error('Error saving categories:', error);
-        Alert.alert('ত্রুটি', 'ক্যাটাগরি সেভ করতে সমস্যা হয়েছে।');
-      }
-    };
-    
-    if (!loading && categories.length > 0) {
-      saveCategories();
+
+  // Helper function to save products
+  const saveProducts = async (updatedProducts: Product[]) => {
+    try {
+      await AsyncStorage.setItem('products', JSON.stringify(updatedProducts));
+      setProducts(updatedProducts);
+    } catch (error) {
+      console.error('Error saving products:', error);
+      Alert.alert('ডাটা সেভ করতে সমস্যা হচ্ছে', 'অ্যাপ্লিকেশন পুনরায় চালু করুন।');
     }
-  }, [categories, loading]);
-  
-  // Save products to AsyncStorage whenever they change
-  useEffect(() => {
-    const saveProducts = async () => {
-      try {
-        await AsyncStorage.setItem('products', JSON.stringify(products));
-      } catch (error) {
-        console.error('Error saving products:', error);
-        Alert.alert('ত্রুটি', 'পণ্য সেভ করতে সমস্যা হয়েছে।');
-      }
-    };
-    
-    if (!loading) {
-      saveProducts();
+  };
+
+  // Helper function to save categories
+  const saveCategories = async (updatedCategories: Category[]) => {
+    try {
+      await AsyncStorage.setItem('categories', JSON.stringify(updatedCategories));
+      setCategories(updatedCategories);
+    } catch (error) {
+      console.error('Error saving categories:', error);
+      Alert.alert('ডাটা সেভ করতে সমস্যা হচ্ছে', 'অ্যাপ্লিকেশন পুনরায় চালু করুন।');
     }
-  }, [products, loading]);
-
-  const addCategory = (name: string) => {
-    const newCategory: Category = {
-      id: Date.now().toString(),
-      name,
-      companies: []
-    };
-    
-    setCategories(prevCategories => [...prevCategories, newCategory]);
   };
 
-  const addCompany = (categoryId: string, companyName: string) => {
-    const newCompany: Company = {
-      id: Date.now().toString(),
-      name: companyName,
-      productTypes: []
-    };
-    
-    setCategories(prevCategories => 
-      prevCategories.map(category => 
-        category.id === categoryId 
-          ? { ...category, companies: [...category.companies, newCompany] } 
-          : category
-      )
-    );
+  // Product Management Functions
+  const addProduct = async (product: Product) => {
+    const updatedProducts = [...products, product];
+    await saveProducts(updatedProducts);
   };
 
-  const addProductType = (categoryId: string, companyId: string, productType: Partial<ProductType>) => {
-    const newProductType: ProductType = {
-      id: Date.now().toString(),
-      name: productType.name || 'নতুন প্রোডাক্ট',
-      hasColors: productType.hasColors || false,
-      colors: productType.colors || [],
-      thicknessRange: productType.thicknessRange,
-      thicknessOptions: productType.thicknessOptions,
-      sizeRange: productType.sizeRange
-    };
-    
-    setCategories(prevCategories => 
-      prevCategories.map(category => 
-        category.id === categoryId 
-          ? {
-              ...category,
-              companies: category.companies.map(company => 
-                company.id === companyId 
-                  ? { ...company, productTypes: [...company.productTypes, newProductType] } 
-                  : company
-              )
-            } 
-          : category
-      )
-    );
+  const updateProduct = async (product: Product) => {
+    const updatedProducts = products.map(p => p.id === product.id ? product : p);
+    await saveProducts(updatedProducts);
   };
 
-  const addProduct = (product: Partial<Product>) => {
-    const newProduct: Product = {
-      id: Date.now().toString(),
-      category: product.category || '',
-      company: product.company,
-      type: product.type,
-      color: product.color,
-      thickness: product.thickness || '',
-      size: product.size || '',
-      purchasePrice: product.purchasePrice || 0,
-      salePrice: product.salePrice || 0,
-      stock: product.stock || 0,
-      photoUri: product.photoUri,
-      lowStockThreshold: product.lowStockThreshold || 5
-    };
-    
-    setProducts(prevProducts => [...prevProducts, newProduct]);
+  const deleteProduct = async (productId: string) => {
+    const updatedProducts = products.filter(p => p.id !== productId);
+    await saveProducts(updatedProducts);
   };
 
-  const updateProduct = (productId: string, updates: Partial<Product>) => {
-    setProducts(prevProducts => 
-      prevProducts.map(product => 
-        product.id === productId ? { ...product, ...updates } : product
-      )
-    );
-  };
-
-  const deleteProduct = (productId: string) => {
-    setProducts(prevProducts => prevProducts.filter(product => product.id !== productId));
-  };
-
-  const saveProductImage = async (productId: string, imageUri: string) => {
-    // Update product with image URI
-    updateProduct(productId, { photoUri: imageUri });
-    
-    // In a real app with Firebase Storage, you would upload the image here
-    // For now, we'll just store the URI in AsyncStorage via the products update
+  const getProductsByCategory = (categoryId: string) => {
+    return products.filter(p => p.categoryId === categoryId);
   };
 
   const getLowStockProducts = () => {
-    return products.filter(product => 
-      product.stock <= (product.lowStockThreshold || 5)
+    return products.filter(p => p.stock <= p.lowStockThreshold);
+  };
+
+  // Category Management Functions
+  const addCategory = async (category: Category) => {
+    const updatedCategories = [...categories, category];
+    await saveCategories(updatedCategories);
+  };
+
+  const updateCategory = async (category: Category) => {
+    const updatedCategories = categories.map(c => 
+      c.id === category.id ? category : c
     );
+    await saveCategories(updatedCategories);
+  };
+
+  const deleteCategory = async (categoryId: string) => {
+    // Delete category and all products in the category
+    const updatedCategories = categories.filter(c => c.id !== categoryId);
+    await saveCategories(updatedCategories);
+    
+    // Delete products belonging to the category
+    const updatedProducts = products.filter(p => p.categoryId !== categoryId);
+    await saveProducts(updatedProducts);
+  };
+
+  // Company Management Functions
+  const addCompany = async (categoryId: string, company: Company) => {
+    const updatedCategories = categories.map(c => {
+      if (c.id === categoryId) {
+        const companies = c.companies ? [...c.companies, company] : [company];
+        return { ...c, companies };
+      }
+      return c;
+    });
+    
+    await saveCategories(updatedCategories);
+  };
+
+  const updateCompany = async (categoryId: string, company: Company) => {
+    const updatedCategories = categories.map(c => {
+      if (c.id === categoryId && c.companies) {
+        const updatedCompanies = c.companies.map(comp => 
+          comp.id === company.id ? company : comp
+        );
+        return { ...c, companies: updatedCompanies };
+      }
+      return c;
+    });
+    
+    await saveCategories(updatedCategories);
+  };
+
+  const deleteCompany = async (categoryId: string, companyId: string) => {
+    const updatedCategories = categories.map(c => {
+      if (c.id === categoryId && c.companies) {
+        const updatedCompanies = c.companies.filter(comp => comp.id !== companyId);
+        return { ...c, companies: updatedCompanies };
+      }
+      return c;
+    });
+    
+    await saveCategories(updatedCategories);
+    
+    // Update products - remove companyId from products
+    const updatedProducts = products.map(p => {
+      if (p.categoryId === categoryId && p.companyId === companyId) {
+        return { ...p, companyId: undefined, companyName: undefined };
+      }
+      return p;
+    });
+    
+    await saveProducts(updatedProducts);
+  };
+
+  // Product Type Management Functions
+  const addProductType = async (categoryId: string, companyId: string, productType: ProductType) => {
+    const updatedCategories = categories.map(c => {
+      if (c.id === categoryId && c.companies) {
+        const updatedCompanies = c.companies.map(comp => {
+          if (comp.id === companyId) {
+            const productTypes = comp.productTypes ? [...comp.productTypes, productType] : [productType];
+            return { ...comp, productTypes };
+          }
+          return comp;
+        });
+        return { ...c, companies: updatedCompanies };
+      }
+      return c;
+    });
+    
+    await saveCategories(updatedCategories);
+  };
+
+  // Helper functions for getting thicknesses and sizes
+  const getThicknessByCompany = (companyName: string) => {
+    return DEFAULT_THICKNESSES[companyName] || [];
+  };
+
+  const getSizeByCategory = (categoryName: string) => {
+    if (categoryName === 'টিন') return TIN_SIZES;
+    if (categoryName === 'টুয়া' || categoryName === 'প্লেইন শিট') return TUA_SIZES;
+    return [];
   };
 
   return (
-    <ProductContext.Provider 
+    <ProductContext.Provider
       value={{
-        categories,
         products,
-        addCategory,
-        addCompany,
-        addProductType,
+        categories,
         addProduct,
         updateProduct,
         deleteProduct,
-        saveProductImage,
+        getProductsByCategory,
         getLowStockProducts,
-        loading
+        addCategory,
+        updateCategory,
+        deleteCategory,
+        addCompany,
+        updateCompany,
+        deleteCompany,
+        addProductType,
+        getThicknessByCompany,
+        getSizeByCategory
       }}
     >
       {children}
@@ -582,4 +239,12 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
   );
 };
 
-export default ProductProvider;
+export const useProduct = () => {
+  const context = useContext(ProductContext);
+  if (context === undefined) {
+    throw new Error('useProduct must be used within a ProductProvider');
+  }
+  return context;
+};
+
+export default ProductContext;
