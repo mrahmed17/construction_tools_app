@@ -195,3 +195,61 @@ export type PriceListItem = {
   profit: number;
   updatedAt: string;
 };
+
+// MVVM Models - Clear separation of data models from view logic
+export interface ProductModel {
+  id: string;
+  name: string;
+  category: string;
+  company?: string;
+  type?: string;
+  color?: string;
+  thickness?: string;
+  size?: string;
+  purchasePrice: number;
+  sellingPrice: number;
+  stock: number;
+  lowStockThreshold: number;
+  image?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CustomerModel {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
+  totalPurchases: number;
+  lastPurchaseDate?: number;
+  creditLimit: number;
+  outstandingCredit: number;
+  history: CreditHistoryItem[];
+}
+
+export interface CreditHistoryItem {
+  id: string;
+  date: number;
+  amount: number;
+  type: 'purchase' | 'payment';
+  invoiceId?: string;
+  notes?: string;
+  dueDate?: number;
+}
+
+export interface MaterialEstimationResult {
+  materialType: string;
+  quantity: number;
+  unit: string;
+  estimatedCost: number;
+}
+
+export interface DailyCashRecord {
+  id: string;
+  date: number;
+  openingBalance: number;
+  closingBalance: number;
+  sales: number;
+  expenses: number;
+  notes?: string;
+}

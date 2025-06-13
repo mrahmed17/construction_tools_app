@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,136 +8,175 @@ import {
   Alert,
   Image,
   SafeAreaView,
+  RefreshControl,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { MaterialIcons, Ionicons, FontAwesome5, Entypo } from '@expo/vector-icons';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { MaterialIcons, Ionicons, FontAwesome5, Entypo, MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useProducts } from '../context/ProductContext';
 import { useCart } from '../context/CartContext';
+import { useCustomer } from '../context/CustomerContext';
+import { formatCurrency } from '../utils/helpers';
 
-const HomeScreen = () => {
-  const navigation = useNavigation();
-  // Commented out auth for now as requested
-  // const { user } = useAuth();
+// MVVM architecture: ViewModel for the HomeScreen
+const useHomeViewModel = () => {
+  // Fetch data from contexts
   const { products, categories, getLowStockProducts, loading } = useProducts();
-  const { cartItems } = useCart();
+  const { items: cartItems } = useCart();
+  const { getTopDebtors, getUpcomingDues } = useCustomer();
 
-  // Demo stats
+  const navigation = useNavigation();
+  
+  // State management
+  const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({
     totalProducts: 0,
     lowStockCount: 0,
     totalCategories: 0,
     recentSales: 0,
+    totalCustomers: 0,
+    outstandingCredit: 0,
   });
-
-  // Recent transactions
   const [recentTransactions, setRecentTransactions] = useState([]);
-
-  // Add sample sales data for report demo
-  useEffect(() => {
-    const addSampleSalesData = async () => {
-      try {
-        // Check if we already have sales data
-        const existingSales = await AsyncStorage.getItem('sales');
-        if (!existingSales) {
-          const pastWeekSales = [];
-          const today = new Date();
+  const [topDebtors, setTopDebtors] = useState([]);
+  const [upcomingDues, setUpcomingDues] = useState([]);
+  
+  // Load sales data
+  const loadSalesData = async () => {
+    try {
+      // Check if we already have sales data
+      const existingSales = await AsyncStorage.getItem('sales');
+      if (!existingSales) {
+        await generateSampleSalesData();
+      } else {
+        const salesData = JSON.parse(existingSales);
+        setRecentTransactions(salesData.slice(0, 5).map(sale => ({
+          id: sale.id,
+          date: sale.date,
+          customerName: sale.customerName,
+          total: sale.totalAmount,
+          items: sale.items.length
+        })));
+        
+        // Update today's sales in stats
+        const today = new Date();
+        const todaySales = salesData.filter(sale => {
+          const saleDate = new Date(sale.date);
+          return saleDate.getDate() === today.getDate() && 
+                 saleDate.getMonth() === today.getMonth() && 
+                 saleDate.getFullYear() === today.getFullYear();
+        });
+        
+        const todayTotal = todaySales.reduce((sum, sale) => sum + sale.totalAmount, 0);
+        
+        setStats(prev => ({
+          ...prev,
+          recentSales: todayTotal
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading sales data:', error);
+    }
+  };
+  
+  // Generate sample sales data for demo purposes
+  const generateSampleSalesData = async () => {
+    try {
+      const pastWeekSales = [];
+      const today = new Date();
+      
+      // Create 30 days of random sales data
+      for (let i = 0; i < 30; i++) {
+        const saleDate = new Date(today);
+        saleDate.setDate(today.getDate() - i);
+        
+        // Generate 1-3 sales for each day
+        const dailySalesCount = Math.floor(Math.random() * 3) + 1;
+        
+        for (let j = 0; j < dailySalesCount; j++) {
+          const itemCount = Math.floor(Math.random() * 5) + 1;
+          const items = [];
           
-          // Create 30 days of random sales data
-          for (let i = 0; i < 30; i++) {
-            const saleDate = new Date(today);
-            saleDate.setDate(today.getDate() - i);
-            
-            // Generate 1-3 sales for each day
-            const dailySalesCount = Math.floor(Math.random() * 3) + 1;
-            
-            for (let j = 0; j < dailySalesCount; j++) {
-              const itemCount = Math.floor(Math.random() * 5) + 1;
-              const items = [];
-              
-              // Generate random items
-              for (let k = 0; k < itemCount; k++) {
-                const purchasePrice = Math.floor(Math.random() * 1000) + 500;
-                const sellingPrice = purchasePrice + Math.floor(Math.random() * 300);
-                items.push({
-                  id: `item-${Date.now()}-${k}`,
-                  category: ['টিন', 'টুয়া', 'প্লেইন শিট', 'ফুলের শিট'][Math.floor(Math.random() * 4)],
-                  company: ['php', 'KY', 'TK (G)', 'ABUL Khair'][Math.floor(Math.random() * 4)],
-                  product: ['সুপার', 'লুম', 'কালার'][Math.floor(Math.random() * 3)],
-                  quantity: Math.floor(Math.random() * 10) + 1,
-                  purchasePrice,
-                  sellingPrice,
-                  profit: sellingPrice - purchasePrice
-                });
-              }
-              
-              // Calculate totals
-              const totalAmount = items.reduce((sum, item) => sum + (item.sellingPrice * item.quantity), 0);
-              const totalProfit = items.reduce((sum, item) => sum + (item.profit * item.quantity), 0);
-              
-              // Create sale record
-              const sale = {
-                id: `sale-${Date.now()}-${i}-${j}`,
-                date: saleDate.toISOString(),
-                customerName: ['আলি হোসেন', 'করিম মিয়া', 'আব্দুল রহমান', 'মঞ্জুর আলম', 'রফিকুল ইসলাম'][Math.floor(Math.random() * 5)],
-                items,
-                totalAmount,
-                totalProfit,
-                discount: Math.random() > 0.7 ? Math.floor(Math.random() * 500) : 0
-              };
-              
-              pastWeekSales.push(sale);
-            }
+          // Generate random items
+          for (let k = 0; k < itemCount; k++) {
+            const purchasePrice = Math.floor(Math.random() * 1000) + 500;
+            const sellingPrice = purchasePrice + Math.floor(Math.random() * 300);
+            items.push({
+              id: `item-${Date.now()}-${k}`,
+              category: ['টিন', 'টুয়া', 'প্লেইন শিট', 'ফুলের শিট'][Math.floor(Math.random() * 4)],
+              company: ['php', 'KY', 'TK (G)', 'ABUL Khair'][Math.floor(Math.random() * 4)],
+              product: ['সুপার', 'লুম', 'কালার'][Math.floor(Math.random() * 3)],
+              quantity: Math.floor(Math.random() * 10) + 1,
+              purchasePrice,
+              sellingPrice,
+              profit: sellingPrice - purchasePrice
+            });
           }
           
-          // Save to AsyncStorage
-          await AsyncStorage.setItem('sales', JSON.stringify(pastWeekSales));
+          // Calculate totals
+          const totalAmount = items.reduce((sum, item) => sum + (item.sellingPrice * item.quantity), 0);
+          const totalProfit = items.reduce((sum, item) => sum + (item.profit * item.quantity), 0);
           
-          // Also update recent transactions
-          setRecentTransactions(pastWeekSales.slice(0, 5).map(sale => ({
-            id: sale.id,
-            date: sale.date,
-            customerName: sale.customerName,
-            total: sale.totalAmount,
-            items: sale.items.length
-          })));
+          // Create sale record
+          const sale = {
+            id: `sale-${Date.now()}-${i}-${j}`,
+            date: saleDate.toISOString(),
+            customerName: ['আলি হোসেন', 'করিম মিয়া', 'আব্দুল রহমান', 'মঞ্জুর আলম', 'রফিকুল ইসলাম'][Math.floor(Math.random() * 5)],
+            items,
+            totalAmount,
+            totalProfit,
+            discount: Math.random() > 0.7 ? Math.floor(Math.random() * 500) : 0
+          };
           
-          // Update today's sales in stats
-          const todaySales = pastWeekSales.filter(sale => {
-            const saleDate = new Date(sale.date);
-            return saleDate.getDate() === today.getDate() && 
-                   saleDate.getMonth() === today.getMonth() && 
-                   saleDate.getFullYear() === today.getFullYear();
-          });
-          
-          const todayTotal = todaySales.reduce((sum, sale) => sum + sale.totalAmount, 0);
-          
-          setStats(prev => ({
-            ...prev,
-            recentSales: todayTotal
-          }));
-          
-          await AsyncStorage.setItem('recentTransactions', JSON.stringify(pastWeekSales.slice(0, 5).map(sale => ({
-            id: sale.id,
-            date: sale.date,
-            customerName: sale.customerName,
-            total: sale.totalAmount,
-            items: sale.items.length
-          }))));
+          pastWeekSales.push(sale);
         }
-      } catch (error) {
-        console.error('Error adding sample sales data:', error);
       }
-    };
-    
-    addSampleSalesData();
-  }, []);
-
-  // Check low stock alert
-  useEffect(() => {
+      
+      // Save to AsyncStorage
+      await AsyncStorage.setItem('sales', JSON.stringify(pastWeekSales));
+      
+      // Also update recent transactions
+      setRecentTransactions(pastWeekSales.slice(0, 5).map(sale => ({
+        id: sale.id,
+        date: sale.date,
+        customerName: sale.customerName,
+        total: sale.totalAmount,
+        items: sale.items.length
+      })));
+      
+      // Update today's sales in stats
+      const todaySales = pastWeekSales.filter(sale => {
+        const saleDate = new Date(sale.date);
+        return saleDate.getDate() === today.getDate() && 
+                saleDate.getMonth() === today.getMonth() && 
+                saleDate.getFullYear() === today.getFullYear();
+      });
+      
+      const todayTotal = todaySales.reduce((sum, sale) => sum + sale.totalAmount, 0);
+      
+      setStats(prev => ({
+        ...prev,
+        recentSales: todayTotal
+      }));
+      
+      await AsyncStorage.setItem('recentTransactions', JSON.stringify(pastWeekSales.slice(0, 5).map(sale => ({
+        id: sale.id,
+        date: sale.date,
+        customerName: sale.customerName,
+        total: sale.totalAmount,
+        items: sale.items.length
+      }))));
+    } catch (error) {
+      console.error('Error generating sample sales data:', error);
+    }
+  };
+  
+  // Update product stats
+  const updateProductStats = useCallback(() => {
     if (products && products.length > 0) {
       const lowStockProducts = getLowStockProducts();
       
+      // Show low stock alert
       if (lowStockProducts && lowStockProducts.length > 0) {
         Alert.alert(
           'কম স্টক সতর্কতা',
@@ -160,27 +199,51 @@ const HomeScreen = () => {
         totalCategories: Array.isArray(categories) ? categories.length : 0,
       }));
     }
-  }, [products, categories]);
+  }, [products, categories, getLowStockProducts, navigation]);
 
-  // Load recent transactions from AsyncStorage
-  useEffect(() => {
-    const loadTransactions = async () => {
-      try {
-        const savedTransactions = await AsyncStorage.getItem('recentTransactions');
-        if (savedTransactions) {
-          setRecentTransactions(JSON.parse(savedTransactions).slice(0, 5)); // Show only latest 5
-        }
-      } catch (error) {
-        console.error('Error loading transactions:', error);
-      }
-    };
+  // Refresh all data
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
     
-    loadTransactions();
-  }, []);
-
-  const openDrawer = () => {
-    navigation.openDrawer();
-  };
+    try {
+      await loadSalesData();
+      updateProductStats();
+      
+      // Get customer data
+      if (getTopDebtors) {
+        const debtors = getTopDebtors();
+        setTopDebtors(debtors);
+        
+        // Calculate total outstanding credit
+        const totalCredit = debtors.reduce((sum, debtor) => sum + debtor.outstandingCredit, 0);
+        setStats(prev => ({
+          ...prev,
+          totalCustomers: debtors.length,
+          outstandingCredit: totalCredit
+        }));
+      }
+      
+      // Get upcoming due payments
+      if (getUpcomingDues) {
+        const dues = getUpcomingDues(7); // Next 7 days
+        setUpcomingDues(dues);
+      }
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [getLowStockProducts, getTopDebtors, getUpcomingDues, updateProductStats]);
+  
+  // Load data when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      onRefresh();
+      return () => {
+        // Cleanup if needed
+      };
+    }, [onRefresh])
+  );
   
   // Format date
   const formatDate = (dateString) => {
@@ -188,31 +251,64 @@ const HomeScreen = () => {
     return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
   };
   
-  // Format currency
-  const formatCurrency = (amount) => {
-    return `৳${amount.toLocaleString()}`;
+  // Handle navigation
+  const navigateTo = (screenName) => {
+    navigation.navigate(screenName);
   };
+  
+  const openDrawer = () => {
+    navigation.openDrawer();
+  };
+
+  return {
+    stats,
+    recentTransactions,
+    cartItems,
+    topDebtors,
+    upcomingDues,
+    refreshing,
+    onRefresh,
+    formatDate,
+    navigateTo,
+    openDrawer,
+  };
+};
+
+// MVVM architecture: View component that uses the ViewModel
+const HomeScreen = () => {
+  // Use the ViewModel
+  const viewModel = useHomeViewModel();
+  const navigation = useNavigation();
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={openDrawer}>
-            <Ionicons name="menu" size={30} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>ঘর তৈরির সরঞ্জাম</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Cart' as never)}>
-            <View style={styles.cartIconContainer}>
-              <Ionicons name="cart-outline" size={28} color="#333" />
-              {cartItems && cartItems.length > 0 && (
-                <View style={styles.cartBadge}>
-                  <Text style={styles.cartBadgeText}>{cartItems.length}</Text>
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
-        </View>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={viewModel.openDrawer}>
+          <Ionicons name="menu" size={30} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>ঘর তৈরির সরঞ্জাম</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('Cart' as never)}>
+          <View style={styles.cartIconContainer}>
+            <Ionicons name="cart-outline" size={28} color="#333" />
+            {viewModel.cartItems && viewModel.cartItems.length > 0 && (
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartBadgeText}>{viewModel.cartItems.length}</Text>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      </View>
 
+      <ScrollView 
+        style={styles.container}
+        refreshControl={
+          <RefreshControl
+            refreshing={viewModel.refreshing}
+            onRefresh={viewModel.onRefresh}
+            colors={['#1565C0']}
+          />
+        }
+      >
         <View style={styles.welcomeContainer}>
           <Text style={styles.welcomeText}>স্বাগতম</Text>
           <Text style={styles.businessName}>আপনার ব্যবসা</Text>
@@ -221,10 +317,10 @@ const HomeScreen = () => {
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
             <View style={[styles.statIconContainer, { backgroundColor: '#e3f2fd' }]}>
-              <MaterialIcons name="inventory" size={24} color="#1976d2" />
+              <MaterialIcons name="inventory" size={24} color="#1565C0" />
             </View>
             <View>
-              <Text style={styles.statValue}>{stats.totalProducts}</Text>
+              <Text style={styles.statValue}>{viewModel.stats.totalProducts}</Text>
               <Text style={styles.statLabel}>মোট পণ্য</Text>
             </View>
           </View>
@@ -234,18 +330,8 @@ const HomeScreen = () => {
               <MaterialIcons name="warning" size={24} color="#d81b60" />
             </View>
             <View>
-              <Text style={styles.statValue}>{stats.lowStockCount}</Text>
+              <Text style={styles.statValue}>{viewModel.stats.lowStockCount}</Text>
               <Text style={styles.statLabel}>কম স্টক</Text>
-            </View>
-          </View>
-          
-          <View style={styles.statCard}>
-            <View style={[styles.statIconContainer, { backgroundColor: '#e0f2f1' }]}>
-              <MaterialIcons name="category" size={24} color="#009688" />
-            </View>
-            <View>
-              <Text style={styles.statValue}>{stats.totalCategories}</Text>
-              <Text style={styles.statLabel}>ক্যাটাগরি</Text>
             </View>
           </View>
           
@@ -254,8 +340,18 @@ const HomeScreen = () => {
               <FontAwesome5 name="money-bill-wave" size={18} color="#7b1fa2" />
             </View>
             <View>
-              <Text style={styles.statValue}>{formatCurrency(stats.recentSales)}</Text>
+              <Text style={styles.statValue}>{formatCurrency(viewModel.stats.recentSales)}</Text>
               <Text style={styles.statLabel}>আজকের বিক্রয়</Text>
+            </View>
+          </View>
+
+          <View style={styles.statCard}>
+            <View style={[styles.statIconContainer, { backgroundColor: '#e8f5e9' }]}>
+              <MaterialIcons name="attach-money" size={24} color="#388e3c" />
+            </View>
+            <View>
+              <Text style={styles.statValue}>{formatCurrency(viewModel.stats.outstandingCredit)}</Text>
+              <Text style={styles.statLabel}>মোট বাকি</Text>
             </View>
           </View>
         </View>
@@ -265,17 +361,17 @@ const HomeScreen = () => {
           <View style={styles.quickActions}>
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => navigation.navigate('ProductSelection' as never)}
+              onPress={() => viewModel.navigateTo('ProductSelection')}
             >
               <View style={[styles.actionIconContainer, { backgroundColor: '#e3f2fd' }]}>
-                <MaterialIcons name="shopping-bag" size={24} color="#1976d2" />
+                <MaterialIcons name="shopping-bag" size={24} color="#1565C0" />
               </View>
               <Text style={styles.actionText}>নতুন বিক্রয়</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => navigation.navigate('StockManagement' as never)}
+              onPress={() => viewModel.navigateTo('StockManagement')}
             >
               <View style={[styles.actionIconContainer, { backgroundColor: '#e8f5e9' }]}>
                 <MaterialIcons name="add-box" size={24} color="#388e3c" />
@@ -285,7 +381,7 @@ const HomeScreen = () => {
             
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => navigation.navigate('ProductManagement' as never)}
+              onPress={() => viewModel.navigateTo('ProductManagement')}
             >
               <View style={[styles.actionIconContainer, { backgroundColor: '#fff3e0' }]}>
                 <MaterialIcons name="edit" size={24} color="#f57c00" />
@@ -295,27 +391,27 @@ const HomeScreen = () => {
             
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => navigation.navigate('Supplier' as never)}
+              onPress={() => viewModel.navigateTo('CustomerManagement')}
             >
               <View style={[styles.actionIconContainer, { backgroundColor: '#f3e5f5' }]}>
-                <Entypo name="users" size={22} color="#7b1fa2" />
+                <MaterialIcons name="people" size={24} color="#7b1fa2" />
               </View>
-              <Text style={styles.actionText}>সাপ্লায়ার</Text>
+              <Text style={styles.actionText}>কাস্টমার</Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => navigation.navigate('PriceConfig' as never)}
+              onPress={() => viewModel.navigateTo('MaterialCalculator')}
             >
               <View style={[styles.actionIconContainer, { backgroundColor: '#e0f7fa' }]}>
-                <MaterialIcons name="price-change" size={24} color="#0097a7" />
+                <MaterialIcons name="calculate" size={24} color="#0097a7" />
               </View>
-              <Text style={styles.actionText}>মূল্য তালিকা</Text>
+              <Text style={styles.actionText}>ক্যালকুলেটর</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => navigation.navigate('Report' as never)}
+              onPress={() => viewModel.navigateTo('Report')}
             >
               <View style={[styles.actionIconContainer, { backgroundColor: '#fff8e1' }]}>
                 <MaterialIcons name="bar-chart" size={24} color="#ffa000" />
@@ -325,13 +421,44 @@ const HomeScreen = () => {
           </View>
         </View>
 
+        {viewModel.topDebtors && viewModel.topDebtors.length > 0 && (
+          <View style={styles.outstandingContainer}>
+            <View style={styles.sectionTitleContainer}>
+              <Text style={styles.sectionTitle}>বাকি ট্র্যাকিং</Text>
+              <TouchableOpacity onPress={() => viewModel.navigateTo('CustomerManagement')}>
+                <Text style={styles.seeAllText}>সব দেখুন</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {viewModel.topDebtors.slice(0, 3).map((debtor) => (
+              <View key={debtor.id} style={styles.debtorCard}>
+                <View style={styles.debtorInfo}>
+                  <Text style={styles.debtorName}>{debtor.name}</Text>
+                  <Text style={styles.debtorPhone}>{debtor.phone}</Text>
+                </View>
+                <View style={styles.debtorAmount}>
+                  <Text style={styles.debtorAmountText}>
+                    {formatCurrency(debtor.outstandingCredit)}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
         <View style={styles.recentTransactionsContainer}>
-          <Text style={styles.sectionTitle}>সাম্প্রতিক বিক্রয়</Text>
-          {recentTransactions && recentTransactions.length > 0 ? (
-            recentTransactions.map((transaction, index) => (
+          <View style={styles.sectionTitleContainer}>
+            <Text style={styles.sectionTitle}>সাম্প্রতিক বিক্রয়</Text>
+            <TouchableOpacity onPress={() => viewModel.navigateTo('Report')}>
+              <Text style={styles.seeAllText}>সব দেখুন</Text>
+            </TouchableOpacity>
+          </View>
+          
+          {viewModel.recentTransactions && viewModel.recentTransactions.length > 0 ? (
+            viewModel.recentTransactions.map((transaction) => (
               <View key={transaction.id} style={styles.transactionCard}>
                 <View style={styles.transactionLeft}>
-                  <Text style={styles.transactionDate}>{formatDate(transaction.date)}</Text>
+                  <Text style={styles.transactionDate}>{viewModel.formatDate(transaction.date)}</Text>
                   <Text style={styles.transactionCustomer}>{transaction.customerName}</Text>
                   <Text style={styles.transactionItems}>{transaction.items} টি আইটেম</Text>
                 </View>
@@ -348,6 +475,24 @@ const HomeScreen = () => {
               <Text style={styles.noTransactionsText}>কোন বিক্রয় রেকর্ড নেই</Text>
             </View>
           )}
+        </View>
+
+        <View style={styles.materialCalcPromo}>
+          <View style={styles.materialCalcContent}>
+            <MaterialCommunityIcons name="home-roof" size={34} color="#fff" />
+            <View style={styles.materialCalcText}>
+              <Text style={styles.materialCalcTitle}>নির্মাণ সামগ্রী হিসাব করুন</Text>
+              <Text style={styles.materialCalcDescription}>
+                আপনার প্রয়োজনীয় টিন, ইট, সিমেন্ট ইত্যাদি হিসাব করতে ক্যালকুলেটর ব্যবহার করুন
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity 
+            style={styles.materialCalcButton}
+            onPress={() => viewModel.navigateTo('MaterialCalculator')}
+          >
+            <Text style={styles.materialCalcButtonText}>ক্যালকুলেটর খুলুন</Text>
+          </TouchableOpacity>
         </View>
         
         <View style={styles.spacer} />
@@ -401,7 +546,7 @@ const styles = StyleSheet.create({
   },
   welcomeContainer: {
     padding: 16,
-    backgroundColor: '#2196f3',
+    backgroundColor: '#1565C0',
   },
   welcomeText: {
     fontSize: 14,
@@ -419,6 +564,14 @@ const styles = StyleSheet.create({
     padding: 8,
     backgroundColor: '#fff',
     marginBottom: 12,
+    borderRadius: 8,
+    marginHorizontal: 12,
+    marginTop: -24,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   statCard: {
     width: '50%',
@@ -441,10 +594,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#757575',
   },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  seeAllText: {
+    fontSize: 14,
+    color: '#1565C0',
+  },
   quickActionsContainer: {
     backgroundColor: '#fff',
     padding: 16,
     marginBottom: 12,
+    marginHorizontal: 12,
+    borderRadius: 8,
   },
   sectionTitle: {
     fontSize: 18,
@@ -475,9 +640,47 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#333',
   },
+  outstandingContainer: {
+    backgroundColor: '#fff',
+    padding: 16,
+    marginBottom: 12,
+    marginHorizontal: 12,
+    borderRadius: 8,
+  },
+  debtorCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  debtorInfo: {
+    flex: 1,
+  },
+  debtorName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  debtorPhone: {
+    fontSize: 14,
+    color: '#757575',
+    marginTop: 2,
+  },
+  debtorAmount: {
+    justifyContent: 'center',
+  },
+  debtorAmountText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#f57c00',
+  },
   recentTransactionsContainer: {
     backgroundColor: '#fff',
     padding: 16,
+    marginBottom: 12,
+    marginHorizontal: 12,
+    borderRadius: 8,
   },
   transactionCard: {
     flexDirection: 'row',
@@ -509,7 +712,7 @@ const styles = StyleSheet.create({
   transactionAmount: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#2196f3',
+    color: '#1565C0',
   },
   noTransactionsContainer: {
     alignItems: 'center',
@@ -520,6 +723,41 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#757575',
     marginTop: 8,
+  },
+  materialCalcPromo: {
+    backgroundColor: '#1565C0',
+    marginHorizontal: 12,
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+  },
+  materialCalcContent: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  materialCalcText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  materialCalcTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  materialCalcDescription: {
+    fontSize: 14,
+    color: '#e3f2fd',
+  },
+  materialCalcButton: {
+    backgroundColor: '#fff',
+    borderRadius: 4,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  materialCalcButtonText: {
+    color: '#1565C0',
+    fontWeight: 'bold',
   },
   spacer: {
     height: 20,
