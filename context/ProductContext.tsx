@@ -22,6 +22,7 @@ export interface Category {
   id: string;
   name: string;
   companies: Company[];
+  productTypes?: ProductType[]; // For categories without companies like ফুলের শিট
 }
 
 export interface Company {
@@ -279,6 +280,50 @@ const DEFAULT_CATEGORIES: Category[] = [
             }
           }
         ]
+      },
+      {
+        id: '2',
+        name: 'KY',
+        productTypes: [
+          {
+            id: '1',
+            name: 'সুপার',
+            hasColors: false,
+            thicknessRange: {
+              min: 0.120,
+              max: 0.510,
+              step: 0.010,
+              unit: 'মিমি'
+            },
+            sizeRange: {
+              min: 6,
+              max: 10,
+              unit: 'ফুট'
+            }
+          }
+        ]
+      },
+      {
+        id: '3',
+        name: 'TK (G)',
+        productTypes: [
+          {
+            id: '1',
+            name: 'সুপার',
+            hasColors: false,
+            thicknessRange: {
+              min: 0.120,
+              max: 0.510,
+              step: 0.010,
+              unit: 'মিমি'
+            },
+            sizeRange: {
+              min: 6,
+              max: 10,
+              unit: 'ফুট'
+            }
+          }
+        ]
       }
     ]
   },
@@ -360,6 +405,131 @@ const DEFAULT_CATEGORIES: Category[] = [
             }
           }
         ]
+      }
+    ]
+  },
+  {
+    id: '6',
+    name: 'ফুলের ঢেউটিন',
+    companies: [
+      {
+        id: '1',
+        name: 'PHP',
+        productTypes: [
+          {
+            id: '1',
+            name: 'ফুলের ঢেউটিন',
+            hasColors: false,
+            thicknessRange: {
+              min: 0.120,
+              max: 0.510,
+              step: 0.010,
+              unit: 'মিমি'
+            },
+            sizeRange: {
+              min: 6,
+              max: 12,
+              unit: 'ফুট'
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    id: '7',
+    name: 'চাচের প্লাস্টিক',
+    companies: [],
+    productTypes: [
+      {
+        id: '1',
+        name: 'সেলু লাইট',
+        hasColors: false,
+        thicknessRange: {
+          min: 0.120,
+          max: 0.510,
+          step: 0.010,
+          unit: 'মিমি'
+        },
+        sizeRange: {
+          min: 6,
+          max: 12,
+          unit: 'ফুট'
+        }
+      }
+    ]
+  },
+  {
+    id: '8',
+    name: 'চাচ ডিজিটাল',
+    companies: [],
+    productTypes: [
+      {
+        id: '1',
+        name: 'চাচ ডিজিটাল',
+        hasColors: false,
+        // No thickness or size as it's sold by piece
+      }
+    ]
+  },
+  {
+    id: '9',
+    name: 'ডিপ চাচ',
+    companies: [],
+    productTypes: [
+      {
+        id: '1',
+        name: 'ডিপ চাচ',
+        hasColors: false,
+        // No thickness or size as it's sold by piece
+      }
+    ]
+  },
+  {
+    id: '10',
+    name: 'কয়েল',
+    companies: [],
+    productTypes: [
+      {
+        id: '1',
+        name: 'পি-ফোম',
+        hasColors: false,
+        thicknessRange: {
+          min: 4,
+          max: 12,
+          step: 1,
+          unit: 'মিমি'
+        }
+      }
+    ]
+  },
+  {
+    id: '11',
+    name: 'অ্যালুমিনিয়াম',
+    companies: [],
+    productTypes: [
+      {
+        id: '1',
+        name: 'এ-গ্রেড',
+        hasColors: false
+      },
+      {
+        id: '2',
+        name: 'বি-গ্রেড',
+        hasColors: false
+      }
+    ]
+  },
+  {
+    id: '12',
+    name: 'ঝালট',
+    companies: [],
+    productTypes: [
+      {
+        id: '1',
+        name: 'ঝালট',
+        hasColors: false,
+        // No thickness or size as it's sold by piece
       }
     ]
   }

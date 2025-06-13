@@ -18,8 +18,8 @@ import ReportScreen from './screens/ReportScreen';
 import MaterialCalculatorScreen from './screens/MaterialCalculatorScreen';
 import CustomerManagementScreen from './screens/CustomerManagementScreen';
 import PriceConfig from './components/PriceConfig';
-import { StatusBar, View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar, View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
+import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 // Define type for our navigation
@@ -78,7 +78,7 @@ function CustomDrawerContent({ navigation }) {
   ];
 
   return (
-    <SafeAreaView style={styles.drawerContainer}>
+    <SafeAreaView style={styles.drawerContainer} edges={['top', 'right', 'left']}>
       <View style={styles.drawerHeader}>
         <View style={styles.logoContainer}>
           <Ionicons name="business" size={32} color="#1565C0" />
@@ -96,11 +96,25 @@ function CustomDrawerContent({ navigation }) {
             {category.items.map((item, index) => (
               <TouchableOpacity
                 key={index}
-                style={styles.drawerItem}
+                style={[
+                  styles.drawerItem,
+                  navigation.state?.routeNames[navigation.state.index] === item.name && styles.activeDrawerItem
+                ]}
                 onPress={() => navigation.navigate(item.name)}
               >
-                <Ionicons name={item.icon} size={22} color="#555" />
-                <Text style={styles.drawerItemText}>{item.label}</Text>
+                <Ionicons 
+                  name={item.icon} 
+                  size={22} 
+                  color={navigation.state?.routeNames[navigation.state.index] === item.name ? "#1565C0" : "#555"} 
+                />
+                <Text 
+                  style={[
+                    styles.drawerItemText,
+                    navigation.state?.routeNames[navigation.state.index] === item.name && styles.activeDrawerItemText
+                  ]}
+                >
+                  {item.label}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -127,6 +141,10 @@ function DrawerNavigator() {
         drawerStyle: {
           width: 280,
         },
+        drawerType: 'front',
+        swipeEnabled: true,
+        drawerActiveTintColor: '#1565C0',
+        drawerInactiveTintColor: '#555',
       }}
       drawerContent={(props) => <CustomDrawerContent {...props} />}
     >
@@ -179,7 +197,7 @@ function App() {
   }, []);
 
   return (
-    <>
+    <SafeAreaProvider>
       <StatusBar backgroundColor="#1565C0" barStyle="light-content" />
       <NavigationContainer>
         <AuthProvider>
@@ -192,13 +210,14 @@ function App() {
           </ProductProvider>
         </AuthProvider>
       </NavigationContainer>
-    </>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
   drawerContainer: {
     flex: 1,
+    backgroundColor: '#f9f9f9',
   },
   drawerHeader: {
     padding: 16,
@@ -249,10 +268,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
+  activeDrawerItem: {
+    backgroundColor: '#e3f2fd',
+    borderLeftWidth: 4,
+    borderLeftColor: '#1565C0',
+  },
   drawerItemText: {
     marginLeft: 32,
     fontSize: 16,
     color: '#444',
+  },
+  activeDrawerItemText: {
+    color: '#1565C0',
+    fontWeight: 'bold',
   },
   drawerFooter: {
     padding: 16,

@@ -66,8 +66,30 @@ const ProductSelectionScreen = () => {
   
   // Add current selection to entries
   const addProductEntry = () => {
-    if (!selectedCategory || !selectedThickness || !selectedSize) {
-      Alert.alert('ত্রুটি', 'আপনাকে অবশ্যই ক্যাটাগরি, পুরুত্ব এবং সাইজ নির্বাচন করতে হবে।');
+    if (!selectedCategory) {
+      Alert.alert('ত্রুটি', 'আপনাকে অবশ্যই ক্যাটাগরি নির্বাচন করতে হবে।');
+      return;
+    }
+    
+    // Check if the category requires thickness and size
+    const requiresThickness = selectedProductType && 
+      (selectedProductType.thicknessRange || selectedProductType.thicknessOptions);
+    
+    const requiresSize = selectedProductType && selectedProductType.sizeRange;
+    
+    if (requiresThickness && !selectedThickness) {
+      Alert.alert('ত্রুটি', 'আপনাকে অবশ্যই পুরুত্ব নির্বাচন করতে হবে।');
+      return;
+    }
+    
+    if (requiresSize && !selectedSize) {
+      Alert.alert('ত্রুটি', 'আপনাকে অবশ্যই সাইজ নির্বাচন করতে হবে।');
+      return;
+    }
+    
+    // Check if the product type requires color
+    if (selectedProductType && selectedProductType.hasColors && !selectedColor) {
+      Alert.alert('ত্রুটি', 'আপনাকে অবশ্যই কালার নির্বাচন করতে হবে।');
       return;
     }
     
@@ -118,22 +140,12 @@ const ProductSelectionScreen = () => {
         (entry.company ? p.company === entry.company?.name : true) &&
         (entry.productType ? p.type === entry.productType?.name : true) &&
         (entry.color ? p.color === entry.color : true) &&
-        p.thickness === entry.thickness &&
-        p.size === entry.size
+        (entry.thickness ? p.thickness === entry.thickness : true) &&
+        (entry.size ? p.size === entry.size : true)
       );
       
       if (!matchingProduct && entry.category) {
-        // If no exact match, find a product in this category
-        matchingProduct = products.find(p => p.category === entry.category?.name);
-      }
-      
-      if (matchingProduct) {
-        addToCart({
-          ...matchingProduct,
-          quantity: parseInt(entry.quantity)
-        });
-      } else {
-        // No matching product, create placeholder with default prices
+        // If no exact match, create a new product
         const newProduct: Product = {
           id: Date.now().toString(),
           category: entry.category.name,
@@ -142,13 +154,19 @@ const ProductSelectionScreen = () => {
           color: entry.color || undefined,
           thickness: entry.thickness || '',
           size: entry.size || '',
-          purchasePrice: 0,
-          salePrice: 0,
-          stock: 100,
+          purchasePrice: 0, // Default price, will be updated in cart
+          salePrice: 0, // Default price, will be updated in cart
+          stock: 100, // Default stock
           quantity: parseInt(entry.quantity)
         };
         
         addToCart(newProduct);
+      } else if (matchingProduct) {
+        // If we found a matching product, add it to cart
+        addToCart({
+          ...matchingProduct,
+          quantity: parseInt(entry.quantity)
+        });
       }
     });
     
@@ -207,6 +225,11 @@ const ProductSelectionScreen = () => {
     setSelectedColor(null);
     setSelectedThickness(null);
     setSelectedSize(null);
+    
+    // If category has productTypes directly (no companies), set the first one
+    if (selectedCategory && selectedCategory.productTypes && selectedCategory.productTypes.length > 0) {
+      setSelectedProductType(selectedCategory.productTypes[0]);
+    }
   }, [selectedCategory]);
   
   // Reset product type when company changes
@@ -261,7 +284,7 @@ const ProductSelectionScreen = () => {
             </TouchableOpacity>
           </View>
           
-          {/* Company Selection - Only show if category is selected */}
+          {/* Company Selection - Only show if category has companies */}
           {selectedCategory && Array.isArray(selectedCategory.companies) && selectedCategory.companies.length > 0 && (
             <View style={styles.selectionRow}>
               <Text style={styles.selectionLabel}>কোম্পানি:</Text>
@@ -277,8 +300,9 @@ const ProductSelectionScreen = () => {
             </View>
           )}
           
-          {/* Product Type Selection - Only show if company is selected */}
-          {selectedCompany && Array.isArray(selectedCompany.productTypes) && selectedCompany.productTypes.length > 0 && (
+          {/* Product Type Selection - Show based on whether we have company or direct product types */}
+          {((selectedCompany && Array.isArray(selectedCompany.productTypes) && selectedCompany.productTypes.length > 0) ||
+            (selectedCategory && !selectedCompany && selectedCategory.productTypes && selectedCategory.productTypes.length > 0)) && (
             <View style={styles.selectionRow}>
               <Text style={styles.selectionLabel}>প্রোডাক্ট টাইপ:</Text>
               <TouchableOpacity
@@ -309,8 +333,8 @@ const ProductSelectionScreen = () => {
             </View>
           )}
           
-          {/* Thickness Selection */}
-          {selectedProductType && (
+          {/* Thickness Selection - Only show if product type has thickness options */}
+          {selectedProductType && (selectedProductType.thicknessRange || selectedProductType.thicknessOptions) && (
             <View style={styles.selectionRow}>
               <Text style={styles.selectionLabel}>পুরুত্ব:</Text>
               <TouchableOpacity
@@ -325,8 +349,8 @@ const ProductSelectionScreen = () => {
             </View>
           )}
           
-          {/* Size Selection */}
-          {selectedProductType && (
+          {/* Size Selection - Only show if product type has size range */}
+          {selectedProductType && selectedProductType.sizeRange && (
             <View style={styles.selectionRow}>
               <Text style={styles.selectionLabel}>সাইজ:</Text>
               <TouchableOpacity
@@ -401,7 +425,8 @@ const ProductSelectionScreen = () => {
                     {entry.company?.name && `${entry.company.name}, `}
                     {entry.productType?.name && `${entry.productType.name}, `}
                     {entry.color && `${entry.color}, `}
-                    {entry.thickness} মিমি, {entry.size}
+                    {entry.thickness && `${entry.thickness} মিমি, `}
+                    {entry.size}
                   </Text>
                   <Text style={styles.selectedProductQuantity}>
                     পরিমাণ: {entry.quantity}
@@ -506,6 +531,19 @@ const ProductSelectionScreen = () => {
               <Text style={styles.modalTitle}>প্রোডাক্ট টাইপ নির্বাচন করুন</Text>
               <ScrollView>
                 {selectedCompany && Array.isArray(selectedCompany.productTypes) && selectedCompany.productTypes.map((type) => (
+                  <TouchableOpacity
+                    key={type.id}
+                    style={styles.modalItem}
+                    onPress={() => {
+                      setSelectedProductType(type);
+                      setProductTypeModalVisible(false);
+                    }}
+                  >
+                    <Text style={styles.modalItemText}>{type.name}</Text>
+                    {type.hasColors && <Text style={styles.modalItemSubtext}>(কালার অপশন আছে)</Text>}
+                  </TouchableOpacity>
+                ))}
+                {selectedCategory && !selectedCompany && selectedCategory.productTypes && selectedCategory.productTypes.map((type) => (
                   <TouchableOpacity
                     key={type.id}
                     style={styles.modalItem}

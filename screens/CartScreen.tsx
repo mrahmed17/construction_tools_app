@@ -15,10 +15,12 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons, MaterialIcons, FontAwesome } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCart } from '../context/CartContext';
+import { useCustomer } from '../context/CustomerContext';
 
 export default function CartScreen() {
   const navigation = useNavigation();
-  const { cartItems, updateCartItemQuantity, removeFromCart, clearCart } = useCart();
+  const { cartItems, updateCartItemQuantity, removeFromCart, clearCart, calculateTotal, calculateProfit } = useCart();
+  const { addCredit } = useCustomer();
 
   // Customer info
   const [customerName, setCustomerName] = useState('');
@@ -26,7 +28,6 @@ export default function CartScreen() {
   const [customerAddress, setCustomerAddress] = useState('');
   
   // Payment info
-  const [subtotal, setSubtotal] = useState(0);
   const [discountPercent, setDiscountPercent] = useState('0');
   const [discountAmount, setDiscountAmount] = useState(0);
   const [totalAmount, setTotalAmount] = useState(0);
@@ -40,12 +41,7 @@ export default function CartScreen() {
   useEffect(() => {
     if (!cartItems) return;
     
-    const subTotal = cartItems.reduce(
-      (acc, item) => acc + (item.salePrice * (item.quantity || 1)), 0
-    );
-    
-    setSubtotal(subTotal);
-    
+    const subTotal = calculateTotal();
     const discount = (parseFloat(discountPercent) / 100) * subTotal;
     setDiscountAmount(discount);
     
@@ -55,13 +51,13 @@ export default function CartScreen() {
     const advance = parseFloat(advanceAmount) || 0;
     setDueAmount(Math.max(0, total - advance));
     
-  }, [cartItems, discountPercent, advanceAmount]);
+  }, [cartItems, discountPercent, advanceAmount, calculateTotal]);
 
   const handleIncreaseQuantity = (id) => {
     if (!cartItems) return;
     const item = cartItems.find(item => item.id === id);
     if (item) {
-      updateCartItemQuantity(id, (item.quantity || 1) + 1);
+      updateCartItemQuantity(id, item.quantity + 1);
     }
   };
 
@@ -108,12 +104,13 @@ export default function CartScreen() {
         customerMobile,
         customerAddress,
         items: cartItems,
-        subtotal,
+        subtotal: calculateTotal(),
         discountPercent: parseFloat(discountPercent),
         discountAmount,
         total: totalAmount,
         advance: parseFloat(advanceAmount) || 0,
         due: dueAmount,
+        profit: calculateProfit()
       };
       
       // Save to AsyncStorage
@@ -121,6 +118,48 @@ export default function CartScreen() {
       const transactions = savedTransactions ? JSON.parse(savedTransactions) : [];
       transactions.unshift(transaction);
       await AsyncStorage.setItem('recentTransactions', JSON.stringify(transactions));
+      
+      // If there's a due amount and customer mobile is provided, add to customer credit
+      if (dueAmount > 0 && customerMobile) {
+        try {
+          // Find or create customer
+          const customersString = await AsyncStorage.getItem('customers');
+          const customers = customersString ? JSON.parse(customersString) : [];
+          
+          let customer = customers.find(c => c.phone === customerMobile);
+          
+          if (customer) {
+            // Add credit to existing customer
+            await addCredit(customer.id, dueAmount, Date.now() + (30 * 24 * 60 * 60 * 1000), `বিল #${transaction.id}`);
+          } else if (customerName) {
+            // Create new customer and add credit
+            const newCustomer = {
+              id: Date.now().toString(),
+              name: customerName,
+              phone: customerMobile,
+              address: customerAddress,
+              totalPurchases: 1,
+              outstandingCredit: dueAmount,
+              history: [
+                {
+                  id: Date.now().toString(),
+                  date: Date.now(),
+                  amount: dueAmount,
+                  type: 'purchase',
+                  notes: `বিল #${transaction.id}`,
+                  dueDate: Date.now() + (30 * 24 * 60 * 60 * 1000)
+                }
+              ],
+              lastPurchaseDate: Date.now()
+            };
+            
+            customers.push(newCustomer);
+            await AsyncStorage.setItem('customers', JSON.stringify(customers));
+          }
+        } catch (error) {
+          console.error('Error updating customer credit:', error);
+        }
+      }
       
       // Clear cart and close modal
       clearCart();
@@ -148,10 +187,10 @@ export default function CartScreen() {
   };
 
   // Calculate profit amount
-  const calculateProfit = (item) => {
+  const calculateItemProfit = (item) => {
     const sellingPrice = item.salePrice || 0;
     const purchasePrice = item.purchasePrice || 0;
-    return (sellingPrice - purchasePrice) * (item.quantity || 1);
+    return (sellingPrice - purchasePrice) * item.quantity;
   };
   
   // Format currency
@@ -219,10 +258,10 @@ export default function CartScreen() {
                     
                     <View style={styles.priceContainer}>
                       <Text style={styles.itemPrice}>
-                        {formatCurrency(item.salePrice || 0)} × {item.quantity || 1}
+                        {formatCurrency(item.salePrice || 0)} × {item.quantity}
                       </Text>
                       <Text style={styles.itemTotalPrice}>
-                        {formatCurrency((item.salePrice || 0) * (item.quantity || 1))}
+                        {formatCurrency((item.salePrice || 0) * item.quantity)}
                       </Text>
                     </View>
                   </View>
@@ -236,7 +275,7 @@ export default function CartScreen() {
                         <Text style={styles.quantityButtonText}>-</Text>
                       </TouchableOpacity>
                       
-                      <Text style={styles.quantityText}>{item.quantity || 1}</Text>
+                      <Text style={styles.quantityText}>{item.quantity}</Text>
                       
                       <TouchableOpacity
                         style={styles.quantityButton}
@@ -256,7 +295,7 @@ export default function CartScreen() {
                   
                   <View style={styles.profitContainer}>
                     <Text style={styles.profitText}>
-                      লাভ: {formatCurrency(calculateProfit(item))}
+                      লাভ: {formatCurrency(calculateItemProfit(item))}
                     </Text>
                   </View>
                 </View>
@@ -271,7 +310,7 @@ export default function CartScreen() {
               
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>সাবটোটাল</Text>
-                <Text style={styles.summaryValue}>{formatCurrency(subtotal)}</Text>
+                <Text style={styles.summaryValue}>{formatCurrency(calculateTotal())}</Text>
               </View>
               
               <View style={styles.summaryRow}>
@@ -359,7 +398,7 @@ export default function CartScreen() {
                 <View style={styles.paymentSummary}>
                   <View style={styles.paymentRow}>
                     <Text style={styles.paymentLabel}>সাবটোটাল:</Text>
-                    <Text style={styles.paymentValue}>{formatCurrency(subtotal)}</Text>
+                    <Text style={styles.paymentValue}>{formatCurrency(calculateTotal())}</Text>
                   </View>
                   
                   <View style={styles.paymentRow}>
