@@ -10,9 +10,13 @@ export type SupplierType = {
   name: string;
   phone: string;
   address: string;
-  company: string;
-  balance: number;
-  lastPurchase: string;
+  email?: string;
+  notes?: string;
+  unpaidAmount?: number;
+  lastPurchaseDate?: string;
+  company?: string;
+  balance?: number;
+  lastPurchase?: string;
 };
 
 export type ProductType = {
@@ -92,6 +96,8 @@ export type CartItem = {
   productId: string;
   quantity: number;
   product: Product;
+  totalPrice?: number;
+  profit?: number;
 };
 
 export type PriceConfig = {
@@ -162,6 +168,7 @@ export const DefaultFlowerSheetPrints = ['প্রিন্টের শিট'
 export const DefaultAluminumGrades = ['এ-গ্রেড', 'বি-গ্রেড'];
 
 export type BillInfo = {
+  id: string;
   customerName: string;
   customerPhone: string;
   customerAddress: string;
@@ -169,7 +176,9 @@ export type BillInfo = {
   discount: number;
   advance: number;
   totalAmount: number;
+  dueAmount: number;
   items: CartItem[];
+  notes?: string;
 };
 
 export type StockItem = {

@@ -11,22 +11,19 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator
+  ActivityIndicator,
+  StatusBar
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SupplierType } from '../types';
-
-// Define our own Supplier type since it's missing from types/index.ts
-type Supplier = {
-  id: string;
-  name: string;
-  phone: string;
-  address: string;
-  company: string;
-};
+import { useNavigation } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Header from '../components/Header';
+import SearchBar from '../components/SearchBar';
 
 export default function SupplierScreen() {
+  const navigation = useNavigation();
   const [suppliers, setSuppliers] = useState<SupplierType[]>([]);
   const [filteredSuppliers, setFilteredSuppliers] = useState<SupplierType[]>([]);
   const [searchText, setSearchText] = useState('');
@@ -263,30 +260,24 @@ export default function SupplierScreen() {
   };
   
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'right', 'left']}>
+      {/* Header */}
+      <Header title="সাপ্লাইয়ার ব্যবস্থাপনা" />
+      
       {/* Search bar */}
       <View style={styles.searchContainer}>
-        <View style={styles.searchInputContainer}>
-          <Ionicons name="search-outline" size={20} color="#666" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            value={searchText}
-            onChangeText={setSearchText}
-            placeholder="সাপ্লাইয়ার অনুসন্ধান করুন..."
-          />
-          {searchText ? (
-            <TouchableOpacity onPress={() => setSearchText('')} style={styles.clearButton}>
-              <Ionicons name="close-circle" size={20} color="#666" />
-            </TouchableOpacity>
-          ) : null}
-        </View>
+        <SearchBar
+          value={searchText}
+          onChangeText={setSearchText}
+          placeholder="সাপ্লাইয়ার অনুসন্ধান করুন..."
+        />
       </View>
       
       {/* Supplier list */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#344955" />
-          <Text style={styles.loadingText}>Loading suppliers...</Text>
+          <ActivityIndicator size="large" color="#1565C0" />
+          <Text style={styles.loadingText}>সাপ্লাইয়ার লোড হচ্ছে...</Text>
         </View>
       ) : filteredSuppliers.length === 0 ? (
         <View style={styles.emptyContainer}>
@@ -413,12 +404,12 @@ export default function SupplierScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: '#F5F7FA',
   },
@@ -427,23 +418,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
-  },
-  searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-  },
-  searchIcon: {
-    paddingLeft: 10,
-  },
-  searchInput: {
-    flex: 1,
-    padding: 10,
-    fontSize: 16,
-  },
-  clearButton: {
-    padding: 10,
   },
   loadingContainer: {
     flex: 1,
@@ -468,10 +442,15 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   addSupplierButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#1565C0',
     paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 4,
+    borderRadius: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
   },
   addSupplierButtonText: {
     color: 'white',
@@ -521,15 +500,20 @@ const styles = StyleSheet.create({
   },
   editButton: {
     padding: 8,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 20,
+    marginBottom: 8,
   },
   deleteButton: {
     padding: 8,
+    backgroundColor: '#ffebee',
+    borderRadius: 20,
   },
   fabButton: {
     position: 'absolute',
     bottom: 20,
     right: 20,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#1565C0',
     width: 56,
     height: 56,
     borderRadius: 28,
@@ -586,13 +570,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#4A6572',
     marginBottom: 4,
+    fontWeight: '500',
   },
   formInput: {
     backgroundColor: '#f9f9f9',
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 4,
-    padding: 10,
+    borderRadius: 8,
+    padding: 12,
     fontSize: 16,
   },
   multilineInput: {
@@ -610,19 +595,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 4,
+    borderRadius: 8,
     width: '48%',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   cancelButtonText: {
     fontSize: 16,
     color: '#666',
+    fontWeight: '500',
   },
   saveButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#1565C0',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 4,
+    borderRadius: 8,
     width: '48%',
     alignItems: 'center',
   },

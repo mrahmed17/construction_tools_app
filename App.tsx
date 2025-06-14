@@ -18,7 +18,7 @@ import ReportScreen from './screens/ReportScreen';
 import MaterialCalculatorScreen from './screens/MaterialCalculatorScreen';
 import CustomerManagementScreen from './screens/CustomerManagementScreen';
 import PriceConfig from './components/PriceConfig';
-import { StatusBar, View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
+import { StatusBar, View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Platform } from 'react-native';
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -77,6 +77,9 @@ function CustomDrawerContent({ navigation }) {
     },
   ];
 
+  // Get the current route name
+  const currentRouteName = navigation.state?.routeNames[navigation.state.index] || 'Home';
+
   return (
     <SafeAreaView style={styles.drawerContainer} edges={['top', 'right', 'left']}>
       <View style={styles.drawerHeader}>
@@ -98,19 +101,19 @@ function CustomDrawerContent({ navigation }) {
                 key={index}
                 style={[
                   styles.drawerItem,
-                  navigation.state?.routeNames[navigation.state.index] === item.name && styles.activeDrawerItem
+                  currentRouteName === item.name && styles.activeDrawerItem
                 ]}
                 onPress={() => navigation.navigate(item.name)}
               >
                 <Ionicons 
                   name={item.icon} 
                   size={22} 
-                  color={navigation.state?.routeNames[navigation.state.index] === item.name ? "#1565C0" : "#555"} 
+                  color={currentRouteName === item.name ? "#1565C0" : "#555"} 
                 />
                 <Text 
                   style={[
                     styles.drawerItemText,
-                    navigation.state?.routeNames[navigation.state.index] === item.name && styles.activeDrawerItemText
+                    currentRouteName === item.name && styles.activeDrawerItemText
                   ]}
                 >
                   {item.label}
@@ -145,6 +148,7 @@ function DrawerNavigator() {
         swipeEnabled: true,
         drawerActiveTintColor: '#1565C0',
         drawerInactiveTintColor: '#555',
+        swipeEdgeWidth: Platform.OS === 'ios' ? 50 : 100,
       }}
       drawerContent={(props) => <CustomDrawerContent {...props} />}
     >
@@ -291,10 +295,15 @@ const styles = StyleSheet.create({
   logoutButton: {
     flexDirection: 'row',
     backgroundColor: '#e53935',
-    borderRadius: 4,
+    borderRadius: 8,
     padding: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
   },
   logoutText: {
     color: '#fff',
