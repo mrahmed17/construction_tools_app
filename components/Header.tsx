@@ -1,12 +1,13 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface HeaderProps {
   title: string;
   showBackButton?: boolean;
+  showMenuButton?: boolean;
   rightComponent?: React.ReactNode;
   backgroundColor?: string;
   textColor?: string;
@@ -14,7 +15,8 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({
   title,
-  showBackButton = true,
+  showBackButton = false,
+  showMenuButton = true,
   rightComponent,
   backgroundColor = '#1565C0',
   textColor = '#fff',
@@ -26,13 +28,22 @@ const Header: React.FC<HeaderProps> = ({
       <StatusBar backgroundColor={backgroundColor} barStyle="light-content" />
       
       <View style={styles.leftContainer}>
-        {showBackButton && (
+        {showBackButton ? (
           <TouchableOpacity 
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
             <Ionicons name="arrow-back" size={24} color={textColor} />
           </TouchableOpacity>
+        ) : showMenuButton ? (
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+          >
+            <Ionicons name="menu" size={24} color={textColor} />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.placeholderLeft} />
         )}
       </View>
       
@@ -65,6 +76,9 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
   },
+  menuButton: {
+    padding: 8,
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -74,6 +88,9 @@ const styles = StyleSheet.create({
   rightContainer: {
     width: 40,
     alignItems: 'flex-end',
+  },
+  placeholderLeft: {
+    width: 24,
   },
   placeholderRight: {
     width: 24,

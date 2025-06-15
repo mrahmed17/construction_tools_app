@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler';
 import React, { useState, useEffect } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useNavigationState } from '@react-navigation/native';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { createStackNavigator } from '@react-navigation/stack';
 import { AuthProvider } from './context/AuthContext';
@@ -18,7 +18,7 @@ import ReportScreen from './screens/ReportScreen';
 import MaterialCalculatorScreen from './screens/MaterialCalculatorScreen';
 import CustomerManagementScreen from './screens/CustomerManagementScreen';
 import PriceConfig from './components/PriceConfig';
-import { StatusBar, View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Platform } from 'react-native';
+import { StatusBar, View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Platform, Alert } from 'react-native';
 import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -48,7 +48,7 @@ const Drawer = createDrawerNavigator<DrawerParamList>();
 const SKIP_AUTH = true;
 
 // Create a custom sidebar drawer component
-function CustomDrawerContent({ navigation }) {
+function CustomDrawerContent({ navigation, state }) {
   const categories = [
     {
       title: 'মূল মেনু',
@@ -78,7 +78,7 @@ function CustomDrawerContent({ navigation }) {
   ];
 
   // Get the current route name
-  const currentRouteName = navigation.state?.routeNames[navigation.state.index] || 'Home';
+  const currentRouteName = state.routes[state.index].name;
 
   return (
     <SafeAreaView style={styles.drawerContainer} edges={['top', 'right', 'left']}>
@@ -103,7 +103,10 @@ function CustomDrawerContent({ navigation }) {
                   styles.drawerItem,
                   currentRouteName === item.name && styles.activeDrawerItem
                 ]}
-                onPress={() => navigation.navigate(item.name)}
+                onPress={() => {
+                  navigation.navigate(item.name);
+                  navigation.closeDrawer();
+                }}
               >
                 <Ionicons 
                   name={item.icon} 
@@ -125,7 +128,22 @@ function CustomDrawerContent({ navigation }) {
       </ScrollView>
       
       <View style={styles.drawerFooter}>
-        <TouchableOpacity style={styles.logoutButton}>
+        <TouchableOpacity 
+          style={styles.logoutButton}
+          onPress={() => {
+            // In a real app, you would implement logout functionality here
+            Alert.alert('লগআউট', 'আপনি কি লগআউট করতে চান?', [
+              {
+                text: 'না',
+                style: 'cancel'
+              },
+              {
+                text: 'হ্যাঁ',
+                onPress: () => console.log('Logout pressed')
+              }
+            ]);
+          }}
+        >
           <Ionicons name="log-out-outline" size={22} color="#fff" />
           <Text style={styles.logoutText}>লগআউট</Text>
         </TouchableOpacity>
@@ -145,10 +163,10 @@ function DrawerNavigator() {
           width: 280,
         },
         drawerType: 'front',
-        swipeEnabled: true,
+        swipeEnabled: Platform.OS === 'ios' ? false : true,
         drawerActiveTintColor: '#1565C0',
         drawerInactiveTintColor: '#555',
-        swipeEdgeWidth: Platform.OS === 'ios' ? 50 : 100,
+        swipeEdgeWidth: Platform.OS === 'ios' ? 0 : 100,
       }}
       drawerContent={(props) => <CustomDrawerContent {...props} />}
     >

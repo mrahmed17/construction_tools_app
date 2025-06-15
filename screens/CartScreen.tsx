@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,16 +8,17 @@ import {
   TextInput,
   Alert,
   Modal,
-  Platform,
   SafeAreaView
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Ionicons, MaterialIcons, FontAwesome } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCart } from '../context/CartContext';
 import { useCustomer } from '../context/CustomerContext';
+import Header from '../components/Header';
 
-export default function CartScreen() {
+// MVVM architecture: View Model for Cart operations
+const useCartViewModel = () => {
   const navigation = useNavigation();
   const { cartItems, updateCartItemQuantity, removeFromCart, clearCart, calculateTotal, calculateProfit } = useCart();
   const { addCredit } = useCustomer();
@@ -53,23 +54,26 @@ export default function CartScreen() {
     
   }, [cartItems, discountPercent, advanceAmount, calculateTotal]);
 
-  const handleIncreaseQuantity = (id) => {
+  // Increase item quantity
+  const handleIncreaseQuantity = useCallback((id) => {
     if (!cartItems) return;
     const item = cartItems.find(item => item.id === id);
     if (item) {
       updateCartItemQuantity(id, item.quantity + 1);
     }
-  };
+  }, [cartItems, updateCartItemQuantity]);
 
-  const handleDecreaseQuantity = (id) => {
+  // Decrease item quantity
+  const handleDecreaseQuantity = useCallback((id) => {
     if (!cartItems) return;
     const item = cartItems.find(item => item.id === id);
     if (item && item.quantity > 1) {
       updateCartItemQuantity(id, item.quantity - 1);
     }
-  };
+  }, [cartItems, updateCartItemQuantity]);
 
-  const handleRemoveItem = (id) => {
+  // Remove item from cart
+  const handleRemoveItem = useCallback((id) => {
     Alert.alert(
       'নিশ্চিত করুন',
       'আপনি কি এই পণ্যটি কার্ট থেকে সরাতে চান?',
@@ -78,18 +82,32 @@ export default function CartScreen() {
         { text: 'হ্যাঁ', onPress: () => removeFromCart(id) }
       ]
     );
-  };
+  }, [removeFromCart]);
 
-  const handleCheckout = () => {
+  // Handle checkout button press
+  const handleCheckout = useCallback(() => {
     if (!cartItems || cartItems.length === 0) {
       Alert.alert('ত্রুটি', 'কার্টে কোন পণ্য নেই।');
       return;
     }
     
     setCheckoutModalVisible(true);
-  };
+  }, [cartItems]);
 
-  const handleCompleteCheckout = async () => {
+  // Handle clear cart button press
+  const handleClearCart = useCallback(() => {
+    Alert.alert(
+      'নিশ্চিত করুন',
+      'আপনি কি কার্ট পরিষ্কার করতে চান?',
+      [
+        { text: 'না', style: 'cancel' },
+        { text: 'হ্যাঁ', onPress: () => clearCart() }
+      ]
+    );
+  }, [clearCart]);
+
+  // Complete checkout process
+  const handleCompleteCheckout = useCallback(async () => {
     if (!customerName) {
       Alert.alert('ত্রুটি', 'কাস্টমারের নাম লিখুন।');
       return;
@@ -184,51 +202,75 @@ export default function CartScreen() {
       console.error('Checkout error:', error);
       Alert.alert('ত্রুটি', 'বিক্রয় সম্পন্ন করতে সমস্যা হয়েছে।');
     }
-  };
+  }, [
+    customerName, 
+    customerMobile, 
+    customerAddress, 
+    cartItems, 
+    calculateTotal, 
+    discountPercent, 
+    discountAmount, 
+    totalAmount, 
+    advanceAmount, 
+    dueAmount, 
+    calculateProfit, 
+    addCredit, 
+    clearCart, 
+    navigation
+  ]);
 
-  // Calculate profit amount
-  const calculateItemProfit = (item) => {
+  // Calculate profit amount for a single item
+  const calculateItemProfit = useCallback((item) => {
     const sellingPrice = item.salePrice || 0;
     const purchasePrice = item.purchasePrice || 0;
     return (sellingPrice - purchasePrice) * item.quantity;
-  };
+  }, []);
   
   // Format currency
-  const formatCurrency = (amount) => {
+  const formatCurrency = useCallback((amount) => {
     return `৳${amount.toLocaleString('bn-BD')}`;
+  }, []);
+
+  return {
+    cartItems,
+    customerName,
+    setCustomerName,
+    customerMobile,
+    setCustomerMobile,
+    customerAddress,
+    setCustomerAddress,
+    discountPercent,
+    setDiscountPercent,
+    discountAmount,
+    totalAmount,
+    advanceAmount,
+    setAdvanceAmount,
+    dueAmount,
+    checkoutModalVisible,
+    setCheckoutModalVisible,
+    handleIncreaseQuantity,
+    handleDecreaseQuantity,
+    handleRemoveItem,
+    handleCheckout,
+    handleClearCart,
+    handleCompleteCheckout,
+    calculateItemProfit,
+    formatCurrency,
+    calculateTotal
   };
+};
+
+// MVVM architecture: View component that uses the ViewModel
+export default function CartScreen() {
+  const navigation = useNavigation();
+  const viewModel = useCartViewModel();
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={24} color="#000" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>আপনার কার্ট</Text>
-          {cartItems && cartItems.length > 0 && (
-            <TouchableOpacity
-              style={styles.clearButton}
-              onPress={() => {
-                Alert.alert(
-                  'নিশ্চিত করুন',
-                  'আপনি কি কার্ট পরিষ্কার করতে চান?',
-                  [
-                    { text: 'না', style: 'cancel' },
-                    { text: 'হ্যাঁ', onPress: () => clearCart() }
-                  ]
-                );
-              }}
-            >
-              <MaterialIcons name="delete-sweep" size={24} color="#ff5722" />
-            </TouchableOpacity>
-          )}
-        </View>
+        <Header title="আপনার কার্ট" showBackButton={true} />
 
-        {!cartItems || cartItems.length === 0 ? (
+        {!viewModel.cartItems || viewModel.cartItems.length === 0 ? (
           <View style={styles.emptyCartContainer}>
             <MaterialIcons name="shopping-cart" size={80} color="#e0e0e0" />
             <Text style={styles.emptyCartText}>আপনার কার্ট খালি</Text>
@@ -241,8 +283,19 @@ export default function CartScreen() {
           </View>
         ) : (
           <>
+            <View style={styles.cartHeader}>
+              <Text style={styles.cartTitle}>কার্টের পণ্য</Text>
+              <TouchableOpacity
+                style={styles.clearButton}
+                onPress={viewModel.handleClearCart}
+              >
+                <MaterialIcons name="delete-sweep" size={24} color="#ff5722" />
+                <Text style={styles.clearButtonText}>সব মুছুন</Text>
+              </TouchableOpacity>
+            </View>
+            
             <ScrollView style={styles.cartItemsContainer}>
-              {cartItems.map((item) => (
+              {viewModel.cartItems.map((item) => (
                 <View key={item.id} style={styles.cartItem}>
                   <View style={styles.itemInfo}>
                     <View>
@@ -258,10 +311,10 @@ export default function CartScreen() {
                     
                     <View style={styles.priceContainer}>
                       <Text style={styles.itemPrice}>
-                        {formatCurrency(item.salePrice || 0)} × {item.quantity}
+                        {viewModel.formatCurrency(item.salePrice || 0)} × {item.quantity}
                       </Text>
                       <Text style={styles.itemTotalPrice}>
-                        {formatCurrency((item.salePrice || 0) * item.quantity)}
+                        {viewModel.formatCurrency((item.salePrice || 0) * item.quantity)}
                       </Text>
                     </View>
                   </View>
@@ -270,7 +323,7 @@ export default function CartScreen() {
                     <View style={styles.quantityControl}>
                       <TouchableOpacity
                         style={styles.quantityButton}
-                        onPress={() => handleDecreaseQuantity(item.id)}
+                        onPress={() => viewModel.handleDecreaseQuantity(item.id)}
                       >
                         <Text style={styles.quantityButtonText}>-</Text>
                       </TouchableOpacity>
@@ -279,7 +332,7 @@ export default function CartScreen() {
                       
                       <TouchableOpacity
                         style={styles.quantityButton}
-                        onPress={() => handleIncreaseQuantity(item.id)}
+                        onPress={() => viewModel.handleIncreaseQuantity(item.id)}
                       >
                         <Text style={styles.quantityButtonText}>+</Text>
                       </TouchableOpacity>
@@ -287,7 +340,7 @@ export default function CartScreen() {
                     
                     <TouchableOpacity
                       style={styles.removeButton}
-                      onPress={() => handleRemoveItem(item.id)}
+                      onPress={() => viewModel.handleRemoveItem(item.id)}
                     >
                       <MaterialIcons name="delete" size={20} color="#fff" />
                     </TouchableOpacity>
@@ -295,7 +348,7 @@ export default function CartScreen() {
                   
                   <View style={styles.profitContainer}>
                     <Text style={styles.profitText}>
-                      লাভ: {formatCurrency(calculateItemProfit(item))}
+                      লাভ: {viewModel.formatCurrency(viewModel.calculateItemProfit(item))}
                     </Text>
                   </View>
                 </View>
@@ -305,27 +358,27 @@ export default function CartScreen() {
             <View style={styles.summaryContainer}>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>মোট পণ্য</Text>
-                <Text style={styles.summaryValue}>{cartItems ? cartItems.length : 0}</Text>
+                <Text style={styles.summaryValue}>{viewModel.cartItems ? viewModel.cartItems.length : 0}</Text>
               </View>
               
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>সাবটোটাল</Text>
-                <Text style={styles.summaryValue}>{formatCurrency(calculateTotal())}</Text>
+                <Text style={styles.summaryValue}>{viewModel.formatCurrency(viewModel.calculateTotal())}</Text>
               </View>
               
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>ডিসকাউন্ট</Text>
-                <Text style={styles.summaryValue}>{formatCurrency(discountAmount)}</Text>
+                <Text style={styles.summaryValue}>{viewModel.formatCurrency(viewModel.discountAmount)}</Text>
               </View>
               
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabelTotal}>মোট</Text>
-                <Text style={styles.summaryValueTotal}>{formatCurrency(totalAmount)}</Text>
+                <Text style={styles.summaryValueTotal}>{viewModel.formatCurrency(viewModel.totalAmount)}</Text>
               </View>
               
               <TouchableOpacity
                 style={styles.checkoutButton}
-                onPress={handleCheckout}
+                onPress={viewModel.handleCheckout}
               >
                 <Text style={styles.checkoutButtonText}>চেকআউট</Text>
                 <MaterialIcons name="arrow-forward" size={20} color="#fff" />
@@ -338,8 +391,8 @@ export default function CartScreen() {
         <Modal
           animationType="slide"
           transparent={true}
-          visible={checkoutModalVisible}
-          onRequestClose={() => setCheckoutModalVisible(false)}
+          visible={viewModel.checkoutModalVisible}
+          onRequestClose={() => viewModel.setCheckoutModalVisible(false)}
         >
           <View style={styles.modalContainer}>
             <View style={styles.modalContent}>
@@ -351,16 +404,16 @@ export default function CartScreen() {
                 <Text style={styles.inputLabel}>কাস্টমারের নাম *</Text>
                 <TextInput
                   style={styles.input}
-                  value={customerName}
-                  onChangeText={setCustomerName}
+                  value={viewModel.customerName}
+                  onChangeText={viewModel.setCustomerName}
                   placeholder="কাস্টমারের নাম লিখুন"
                 />
                 
                 <Text style={styles.inputLabel}>মোবাইল নম্বর</Text>
                 <TextInput
                   style={styles.input}
-                  value={customerMobile}
-                  onChangeText={setCustomerMobile}
+                  value={viewModel.customerMobile}
+                  onChangeText={viewModel.setCustomerMobile}
                   placeholder="মোবাইল নম্বর লিখুন"
                   keyboardType="phone-pad"
                 />
@@ -368,8 +421,8 @@ export default function CartScreen() {
                 <Text style={styles.inputLabel}>ঠিকানা</Text>
                 <TextInput
                   style={[styles.input, styles.textArea]}
-                  value={customerAddress}
-                  onChangeText={setCustomerAddress}
+                  value={viewModel.customerAddress}
+                  onChangeText={viewModel.setCustomerAddress}
                   placeholder="ঠিকানা লিখুন"
                   multiline
                   numberOfLines={3}
@@ -380,8 +433,8 @@ export default function CartScreen() {
                 <Text style={styles.inputLabel}>ডিসকাউন্ট (%)</Text>
                 <TextInput
                   style={styles.input}
-                  value={discountPercent}
-                  onChangeText={setDiscountPercent}
+                  value={viewModel.discountPercent}
+                  onChangeText={viewModel.setDiscountPercent}
                   placeholder="ডিসকাউন্ট শতাংশ"
                   keyboardType="numeric"
                 />
@@ -389,8 +442,8 @@ export default function CartScreen() {
                 <Text style={styles.inputLabel}>অগ্রিম (৳)</Text>
                 <TextInput
                   style={styles.input}
-                  value={advanceAmount}
-                  onChangeText={setAdvanceAmount}
+                  value={viewModel.advanceAmount}
+                  onChangeText={viewModel.setAdvanceAmount}
                   placeholder="অগ্রিম পরিমাণ"
                   keyboardType="numeric"
                 />
@@ -398,41 +451,41 @@ export default function CartScreen() {
                 <View style={styles.paymentSummary}>
                   <View style={styles.paymentRow}>
                     <Text style={styles.paymentLabel}>সাবটোটাল:</Text>
-                    <Text style={styles.paymentValue}>{formatCurrency(calculateTotal())}</Text>
+                    <Text style={styles.paymentValue}>{viewModel.formatCurrency(viewModel.calculateTotal())}</Text>
                   </View>
                   
                   <View style={styles.paymentRow}>
                     <Text style={styles.paymentLabel}>ডিসকাউন্ট:</Text>
-                    <Text style={styles.paymentValue}>- {formatCurrency(discountAmount)}</Text>
+                    <Text style={styles.paymentValue}>- {viewModel.formatCurrency(viewModel.discountAmount)}</Text>
                   </View>
                   
                   <View style={styles.paymentRow}>
                     <Text style={styles.paymentLabel}>মোট:</Text>
-                    <Text style={styles.paymentValue}>{formatCurrency(totalAmount)}</Text>
+                    <Text style={styles.paymentValue}>{viewModel.formatCurrency(viewModel.totalAmount)}</Text>
                   </View>
                   
                   <View style={styles.paymentRow}>
                     <Text style={styles.paymentLabel}>অগ্রিম:</Text>
-                    <Text style={styles.paymentValue}>{formatCurrency(parseFloat(advanceAmount) || 0)}</Text>
+                    <Text style={styles.paymentValue}>{viewModel.formatCurrency(parseFloat(viewModel.advanceAmount) || 0)}</Text>
                   </View>
                   
                   <View style={[styles.paymentRow, styles.dueRow]}>
                     <Text style={styles.dueLabel}>বাকি:</Text>
-                    <Text style={styles.dueValue}>{formatCurrency(dueAmount)}</Text>
+                    <Text style={styles.dueValue}>{viewModel.formatCurrency(viewModel.dueAmount)}</Text>
                   </View>
                 </View>
                 
                 <View style={styles.modalButtonContainer}>
                   <TouchableOpacity
                     style={styles.cancelButton}
-                    onPress={() => setCheckoutModalVisible(false)}
+                    onPress={() => viewModel.setCheckoutModalVisible(false)}
                   >
                     <Text style={styles.cancelButtonText}>বাতিল</Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity
                     style={styles.confirmButton}
-                    onPress={handleCompleteCheckout}
+                    onPress={viewModel.handleCompleteCheckout}
                   >
                     <Text style={styles.confirmButtonText}>সম্পন্ন করুন</Text>
                   </TouchableOpacity>
@@ -455,7 +508,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f8f8',
   },
-  header: {
+  cartHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -465,15 +518,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 18,
+  cartTitle: {
+    fontSize: 16,
     fontWeight: 'bold',
+    color: '#333',
   },
   clearButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 8,
+  },
+  clearButtonText: {
+    color: '#ff5722',
+    marginLeft: 4,
+    fontWeight: '500',
   },
   emptyCartContainer: {
     flex: 1,

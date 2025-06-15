@@ -278,7 +278,8 @@ const ReportScreen = () => {
     }
   };
   
-  const generateReactNativePdfHtml = () => {
+  // Generate HTML content for PDF
+  const generatePdfHtml = () => {
     // Create formatted prices
     const formattedTotal = totalSales.toLocaleString();
     const formattedProfit = totalProfit.toLocaleString();
@@ -329,6 +330,7 @@ const ReportScreen = () => {
     
     // Create HTML for the PDF
     return `
+      <!DOCTYPE html>
       <html>
         <head>
           <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
@@ -487,7 +489,7 @@ const ReportScreen = () => {
       setLoading(true);
       
       // Create HTML for the PDF using the helper function
-      const html = generateReactNativePdfHtml();
+      const html = generatePdfHtml();
       
       // Create the PDF file
       const { uri } = await Print.printToFileAsync({ html });
@@ -830,8 +832,8 @@ const styles = StyleSheet.create({
   },
   bar: {
     width: 24,
-    height: '80%', // Changed from percentage string to absolute value
-    maxHeight: 150, // Added max height for safety
+    height: 150,
+    maxHeight: 150,
     borderTopLeftRadius: 3,
     borderTopRightRadius: 3,
   },

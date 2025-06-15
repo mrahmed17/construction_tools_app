@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
-  StatusBar
+  ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -22,8 +21,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Header from '../components/Header';
 import SearchBar from '../components/SearchBar';
 
-export default function SupplierScreen() {
-  const navigation = useNavigation();
+// MVVM architecture: View Model for Supplier Management operations
+const useSupplierViewModel = () => {
   const [suppliers, setSuppliers] = useState<SupplierType[]>([]);
   const [filteredSuppliers, setFilteredSuppliers] = useState<SupplierType[]>([]);
   const [searchText, setSearchText] = useState('');
@@ -36,6 +35,8 @@ export default function SupplierScreen() {
   const [supplierAddress, setSupplierAddress] = useState('');
   const [supplierEmail, setSupplierEmail] = useState('');
   const [supplierNotes, setSupplierNotes] = useState('');
+  const [supplierCompany, setSupplierCompany] = useState('');
+  const [supplierBalance, setSupplierBalance] = useState('0');
   
   // Load suppliers on component mount
   useEffect(() => {
@@ -68,7 +69,7 @@ export default function SupplierScreen() {
   };
   
   // Filter suppliers based on search text
-  const filterSuppliers = () => {
+  const filterSuppliers = useCallback(() => {
     if (!searchText) {
       setFilteredSuppliers(suppliers);
       return;
@@ -78,11 +79,12 @@ export default function SupplierScreen() {
     const filtered = suppliers.filter(s => 
       (s.name && s.name.toLowerCase().includes(lowerCaseSearch)) ||
       (s.phone && s.phone.includes(searchText)) ||
+      (s.company && s.company.toLowerCase().includes(lowerCaseSearch)) ||
       (s.address && s.address.toLowerCase().includes(lowerCaseSearch))
     );
     
     setFilteredSuppliers(filtered);
-  };
+  }, [searchText, suppliers]);
   
   // Save supplier to storage
   const saveSupplier = async (supplier: SupplierType) => {
@@ -143,41 +145,45 @@ export default function SupplierScreen() {
   };
   
   // Open modal for adding new supplier
-  const openAddSupplierModal = () => {
+  const openAddSupplierModal = useCallback(() => {
     setEditingSupplier(null);
     resetForm();
     setIsModalVisible(true);
-  };
+  }, []);
   
   // Open modal for editing existing supplier
-  const openEditSupplierModal = (supplier: SupplierType) => {
+  const openEditSupplierModal = useCallback((supplier: SupplierType) => {
     setEditingSupplier(supplier);
     setSupplierName(supplier.name);
     setSupplierPhone(supplier.phone);
     setSupplierAddress(supplier.address);
     setSupplierEmail(supplier.email || '');
     setSupplierNotes(supplier.notes || '');
+    setSupplierCompany(supplier.company || '');
+    setSupplierBalance(supplier.balance ? supplier.balance.toString() : '0');
     setIsModalVisible(true);
-  };
+  }, []);
   
   // Reset form fields
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setSupplierName('');
     setSupplierPhone('');
     setSupplierAddress('');
     setSupplierEmail('');
     setSupplierNotes('');
-  };
+    setSupplierCompany('');
+    setSupplierBalance('0');
+  }, []);
   
   // Reset form and close modal
-  const resetFormAndCloseModal = () => {
+  const resetFormAndCloseModal = useCallback(() => {
     resetForm();
     setIsModalVisible(false);
     setEditingSupplier(null);
-  };
+  }, [resetForm]);
   
   // Handle submit for add/edit supplier
-  const handleSubmit = () => {
+  const handleSubmit = useCallback(() => {
     if (!validateForm()) return;
     
     const supplier: SupplierType = {
@@ -187,15 +193,29 @@ export default function SupplierScreen() {
       address: supplierAddress,
       email: supplierEmail || undefined,
       notes: supplierNotes || undefined,
+      company: supplierCompany || undefined,
+      balance: parseFloat(supplierBalance) || 0,
       unpaidAmount: editingSupplier ? editingSupplier.unpaidAmount : 0,
-      lastPurchaseDate: editingSupplier ? editingSupplier.lastPurchaseDate : undefined
+      lastPurchaseDate: editingSupplier ? editingSupplier.lastPurchaseDate : undefined,
+      lastPurchase: editingSupplier ? editingSupplier.lastPurchase : undefined
     };
     
     saveSupplier(supplier);
-  };
+  }, [
+    supplierName, 
+    supplierPhone, 
+    supplierAddress, 
+    supplierEmail, 
+    supplierNotes, 
+    supplierCompany, 
+    supplierBalance, 
+    editingSupplier, 
+    validateForm, 
+    saveSupplier
+  ]);
   
   // Validate form before saving
-  const validateForm = () => {
+  const validateForm = useCallback(() => {
     if (!supplierName.trim()) {
       Alert.alert('Error', 'সাপ্লাইয়ারের নাম প্রবেশ করুন');
       return false;
@@ -212,7 +232,41 @@ export default function SupplierScreen() {
     }
     
     return true;
+  }, [supplierName, supplierPhone, supplierAddress]);
+
+  return {
+    suppliers: filteredSuppliers,
+    loading,
+    searchText,
+    setSearchText,
+    isModalVisible,
+    editingSupplier,
+    supplierName,
+    setSupplierName,
+    supplierPhone,
+    setSupplierPhone,
+    supplierAddress,
+    setSupplierAddress,
+    supplierEmail,
+    setSupplierEmail,
+    supplierNotes,
+    setSupplierNotes,
+    supplierCompany,
+    setSupplierCompany,
+    supplierBalance,
+    setSupplierBalance,
+    openAddSupplierModal,
+    openEditSupplierModal,
+    resetFormAndCloseModal,
+    handleSubmit,
+    deleteSupplier
   };
+};
+
+// MVVM architecture: View component that uses the ViewModel
+export default function SupplierScreen() {
+  const navigation = useNavigation();
+  const viewModel = useSupplierViewModel();
   
   // Render each supplier item in the list
   const renderSupplierItem = ({ item }: { item: SupplierType }) => {
@@ -220,9 +274,14 @@ export default function SupplierScreen() {
       <View style={styles.supplierItem}>
         <TouchableOpacity
           style={styles.supplierInfo}
-          onPress={() => openEditSupplierModal(item)}
+          onPress={() => viewModel.openEditSupplierModal(item)}
         >
           <Text style={styles.supplierName}>{item.name}</Text>
+          {item.company && (
+            <Text style={styles.supplierCompany}>
+              <Ionicons name="business-outline" size={14} color="#4A6572" /> {item.company}
+            </Text>
+          )}
           <Text style={styles.supplierDetail}>
             <Ionicons name="call-outline" size={14} color="#4A6572" /> {item.phone}
           </Text>
@@ -239,18 +298,23 @@ export default function SupplierScreen() {
               বাকি: ৳{item.unpaidAmount.toFixed(2)}
             </Text>
           )}
+          {item.balance > 0 && (
+            <Text style={styles.balanceAmount}>
+              ব্যালেন্স: ৳{item.balance.toFixed(2)}
+            </Text>
+          )}
         </TouchableOpacity>
         
         <View style={styles.supplierActions}>
           <TouchableOpacity
             style={styles.editButton}
-            onPress={() => openEditSupplierModal(item)}
+            onPress={() => viewModel.openEditSupplierModal(item)}
           >
             <Ionicons name="create-outline" size={20} color="#4A6572" />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.deleteButton}
-            onPress={() => deleteSupplier(item.id)}
+            onPress={() => viewModel.deleteSupplier(item.id)}
           >
             <Ionicons name="trash-outline" size={20} color="#E57373" />
           </TouchableOpacity>
@@ -260,41 +324,57 @@ export default function SupplierScreen() {
   };
   
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'right', 'left']}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       {/* Header */}
-      <Header title="সাপ্লাইয়ার ব্যবস্থাপনা" />
+      <Header 
+        title="সাপ্লাইয়ার ব্যবস্থাপনা" 
+        showBackButton={true} 
+        showMenuButton={false} 
+        backgroundColor="#1565C0"
+        textColor="#fff"
+        rightComponent={
+          <TouchableOpacity 
+            style={styles.headerButton}
+            onPress={viewModel.openAddSupplierModal}
+          >
+            <Ionicons name="add-circle-outline" size={24} color="#fff" />
+          </TouchableOpacity>
+        }
+      />
       
       {/* Search bar */}
       <View style={styles.searchContainer}>
         <SearchBar
-          value={searchText}
-          onChangeText={setSearchText}
+          value={viewModel.searchText}
+          onChangeText={viewModel.setSearchText}
           placeholder="সাপ্লাইয়ার অনুসন্ধান করুন..."
+          backgroundColor="#f5f5f5"
+          borderColor="#e0e0e0"
         />
       </View>
       
       {/* Supplier list */}
-      {loading ? (
+      {viewModel.loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#1565C0" />
           <Text style={styles.loadingText}>সাপ্লাইয়ার লোড হচ্ছে...</Text>
         </View>
-      ) : filteredSuppliers.length === 0 ? (
+      ) : viewModel.suppliers.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="people-outline" size={60} color="#ccc" />
           <Text style={styles.emptyText}>
-            {searchText ? 'কোন সাপ্লাইয়ার পাওয়া যায়নি' : 'কোন সাপ্লাইয়ার নেই'}
+            {viewModel.searchText ? 'কোন সাপ্লাইয়ার পাওয়া যায়নি' : 'কোন সাপ্লাইয়ার নেই'}
           </Text>
           <TouchableOpacity 
             style={styles.addSupplierButton}
-            onPress={openAddSupplierModal}
+            onPress={viewModel.openAddSupplierModal}
           >
             <Text style={styles.addSupplierButtonText}>নতুন সাপ্লাইয়ার যোগ করুন</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <FlatList
-          data={filteredSuppliers}
+          data={viewModel.suppliers}
           renderItem={renderSupplierItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.supplierList}
@@ -304,17 +384,17 @@ export default function SupplierScreen() {
       {/* Floating Action Button */}
       <TouchableOpacity 
         style={styles.fabButton}
-        onPress={openAddSupplierModal}
+        onPress={viewModel.openAddSupplierModal}
       >
         <Ionicons name="add" size={24} color="#fff" />
       </TouchableOpacity>
       
       {/* Add/Edit Modal */}
       <Modal
-        visible={isModalVisible}
+        visible={viewModel.isModalVisible}
         animationType="slide"
         transparent={true}
-        onRequestClose={resetFormAndCloseModal}
+        onRequestClose={viewModel.resetFormAndCloseModal}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -323,9 +403,9 @@ export default function SupplierScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingSupplier ? 'সাপ্লাইয়ার আপডেট করুন' : 'নতুন সাপ্লাইয়ার যোগ করুন'}
+                {viewModel.editingSupplier ? 'সাপ্লাইয়ার আপডেট করুন' : 'নতুন সাপ্লাইয়ার যোগ করুন'}
               </Text>
-              <TouchableOpacity onPress={resetFormAndCloseModal}>
+              <TouchableOpacity onPress={viewModel.resetFormAndCloseModal}>
                 <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
             </View>
@@ -335,9 +415,19 @@ export default function SupplierScreen() {
                 <Text style={styles.formLabel}>নাম *</Text>
                 <TextInput
                   style={styles.formInput}
-                  value={supplierName}
-                  onChangeText={setSupplierName}
+                  value={viewModel.supplierName}
+                  onChangeText={viewModel.setSupplierName}
                   placeholder="সাপ্লাইয়ারের নাম"
+                />
+              </View>
+              
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>কোম্পানি (ঐচ্ছিক)</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={viewModel.supplierCompany}
+                  onChangeText={viewModel.setSupplierCompany}
+                  placeholder="সাপ্লাইয়ারের কোম্পানি"
                 />
               </View>
               
@@ -345,8 +435,8 @@ export default function SupplierScreen() {
                 <Text style={styles.formLabel}>ফোন নম্বর *</Text>
                 <TextInput
                   style={styles.formInput}
-                  value={supplierPhone}
-                  onChangeText={setSupplierPhone}
+                  value={viewModel.supplierPhone}
+                  onChangeText={viewModel.setSupplierPhone}
                   placeholder="সাপ্লাইয়ারের ফোন নম্বর"
                   keyboardType="phone-pad"
                 />
@@ -356,8 +446,8 @@ export default function SupplierScreen() {
                 <Text style={styles.formLabel}>ঠিকানা *</Text>
                 <TextInput
                   style={[styles.formInput, styles.multilineInput]}
-                  value={supplierAddress}
-                  onChangeText={setSupplierAddress}
+                  value={viewModel.supplierAddress}
+                  onChangeText={viewModel.setSupplierAddress}
                   placeholder="সাপ্লাইয়ারের ঠিকানা"
                   multiline
                 />
@@ -367,10 +457,21 @@ export default function SupplierScreen() {
                 <Text style={styles.formLabel}>ইমেইল (ঐচ্ছিক)</Text>
                 <TextInput
                   style={styles.formInput}
-                  value={supplierEmail}
-                  onChangeText={setSupplierEmail}
+                  value={viewModel.supplierEmail}
+                  onChangeText={viewModel.setSupplierEmail}
                   placeholder="সাপ্লাইয়ারের ইমেইল"
                   keyboardType="email-address"
+                />
+              </View>
+              
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>ব্যালেন্স (ঐচ্ছিক)</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={viewModel.supplierBalance}
+                  onChangeText={viewModel.setSupplierBalance}
+                  placeholder="সাপ্লাইয়ারের ব্যালেন্স"
+                  keyboardType="numeric"
                 />
               </View>
               
@@ -378,8 +479,8 @@ export default function SupplierScreen() {
                 <Text style={styles.formLabel}>নোট (ঐচ্ছিক)</Text>
                 <TextInput
                   style={[styles.formInput, styles.multilineInput]}
-                  value={supplierNotes}
-                  onChangeText={setSupplierNotes}
+                  value={viewModel.supplierNotes}
+                  onChangeText={viewModel.setSupplierNotes}
                   placeholder="সাপ্লাইয়ার সম্পর্কে অতিরিক্ত তথ্য"
                   multiline
                 />
@@ -389,14 +490,14 @@ export default function SupplierScreen() {
             <View style={styles.modalActions}>
               <TouchableOpacity 
                 style={styles.cancelButton}
-                onPress={resetFormAndCloseModal}
+                onPress={viewModel.resetFormAndCloseModal}
               >
                 <Text style={styles.cancelButtonText}>বাতিল</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
                 style={styles.saveButton}
-                onPress={handleSubmit}
+                onPress={viewModel.handleSubmit}
               >
                 <Text style={styles.saveButtonText}>সংরক্ষণ করুন</Text>
               </TouchableOpacity>
@@ -412,6 +513,9 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#F5F7FA',
+  },
+  headerButton: {
+    padding: 8,
   },
   searchContainer: {
     padding: 16,
@@ -484,6 +588,12 @@ const styles = StyleSheet.create({
     color: '#344955',
     marginBottom: 6,
   },
+  supplierCompany: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1565C0',
+    marginBottom: 4,
+  },
   supplierDetail: {
     fontSize: 14,
     color: '#4A6572',
@@ -493,6 +603,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#E57373',
+    marginTop: 4,
+  },
+  balanceAmount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4CAF50',
     marginTop: 4,
   },
   supplierActions: {
