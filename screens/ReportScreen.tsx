@@ -331,7 +331,7 @@ const useReportViewModel = () => {
       `;
     }
     
-    // Create HTML for the PDF
+    // Note: This is HTML string for PDF generation with expo-print, not React Native JSX
     return `
       <!DOCTYPE html>
       <html>
