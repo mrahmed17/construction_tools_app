@@ -19,6 +19,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Print from 'expo-print';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Header from '../components/Header';
 
 // Chart component (simplified version without actual library dependency)
 const LineChart = ({ data, labels }) => {
@@ -65,7 +67,8 @@ const LineChart = ({ data, labels }) => {
   );
 };
 
-const ReportScreen = () => {
+// MVVM architecture: ViewModel for the ReportScreen
+const useReportViewModel = () => {
   const navigation = useNavigation();
   const [reportType, setReportType] = useState('daily');
   const [startDate, setStartDate] = useState(new Date());
@@ -516,185 +519,204 @@ const ReportScreen = () => {
       setLoading(false);
     }
   };
-  
+
+  return {
+    reportType,
+    setReportType,
+    startDate,
+    endDate,
+    showStartDatePicker,
+    setShowStartDatePicker,
+    showEndDatePicker,
+    setShowEndDatePicker,
+    salesData,
+    loading,
+    totalSales,
+    totalProfit,
+    topProducts,
+    chartData,
+    chartLabels,
+    onStartDateChange,
+    onEndDateChange,
+    shareReport,
+    exportPDF
+  };
+};
+
+// MVVM architecture: View component that uses the ViewModel
+const ReportScreen = () => {
+  const navigation = useNavigation();
+  const viewModel = useReportViewModel();
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color="black" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>বিক্রয় রিপোর্ট</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerButton} onPress={exportPDF}>
-            <MaterialIcons name="picture-as-pdf" size={24} color="#d32f2f" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerButton} onPress={shareReport}>
-            <Ionicons name="share-outline" size={24} color="black" />
-          </TouchableOpacity>
-        </View>
-      </View>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <Header 
+        title="বিক্রয় রিপোর্ট" 
+        showBackButton={true} 
+        showMenuButton={false} 
+        backgroundColor="#1565C0"
+        textColor="#fff"
+        rightComponent={
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.headerButton} onPress={viewModel.exportPDF}>
+              <MaterialIcons name="picture-as-pdf" size={24} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerButton} onPress={viewModel.shareReport}>
+              <Ionicons name="share-outline" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        }
+      />
       
-      <View style={styles.reportTypeContainer}>
-        <TouchableOpacity 
-          style={[styles.reportTypeBtn, reportType === 'daily' && styles.activeReportType]} 
-          onPress={() => setReportType('daily')}
-        >
-          <Text style={[styles.reportTypeText, reportType === 'daily' && styles.activeReportText]}>দৈনিক</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.reportTypeBtn, reportType === 'weekly' && styles.activeReportType]} 
-          onPress={() => setReportType('weekly')}
-        >
-          <Text style={[styles.reportTypeText, reportType === 'weekly' && styles.activeReportText]}>সাপ্তাহিক</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.reportTypeBtn, reportType === 'monthly' && styles.activeReportType]} 
-          onPress={() => setReportType('monthly')}
-        >
-          <Text style={[styles.reportTypeText, reportType === 'monthly' && styles.activeReportText]}>মাসিক</Text>
-        </TouchableOpacity>
-      </View>
-      
-      <View style={styles.dateContainer}>
-        <View style={styles.datePickerRow}>
-          <Text style={styles.dateLabel}>শুরুর তারিখ:</Text>
+      <ScrollView style={styles.container}>
+        <View style={styles.reportTypeContainer}>
           <TouchableOpacity 
-            style={styles.datePickerButton}
-            onPress={() => setShowStartDatePicker(true)}
+            style={[styles.reportTypeBtn, viewModel.reportType === 'daily' && styles.activeReportType]} 
+            onPress={() => viewModel.setReportType('daily')}
           >
-            <Text>{startDate.toLocaleDateString()}</Text>
-            <AntDesign name="calendar" size={18} color="black" />
+            <Text style={[styles.reportTypeText, viewModel.reportType === 'daily' && styles.activeReportText]}>দৈনিক</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.reportTypeBtn, viewModel.reportType === 'weekly' && styles.activeReportType]} 
+            onPress={() => viewModel.setReportType('weekly')}
+          >
+            <Text style={[styles.reportTypeText, viewModel.reportType === 'weekly' && styles.activeReportText]}>সাপ্তাহিক</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.reportTypeBtn, viewModel.reportType === 'monthly' && styles.activeReportType]} 
+            onPress={() => viewModel.setReportType('monthly')}
+          >
+            <Text style={[styles.reportTypeText, viewModel.reportType === 'monthly' && styles.activeReportText]}>মাসিক</Text>
           </TouchableOpacity>
         </View>
         
-        {reportType !== 'daily' && (
+        <View style={styles.dateContainer}>
           <View style={styles.datePickerRow}>
-            <Text style={styles.dateLabel}>শেষের তারিখ:</Text>
+            <Text style={styles.dateLabel}>শুরুর তারিখ:</Text>
             <TouchableOpacity 
               style={styles.datePickerButton}
-              onPress={() => setShowEndDatePicker(true)}
+              onPress={() => viewModel.setShowStartDatePicker(true)}
             >
-              <Text>{endDate.toLocaleDateString()}</Text>
+              <Text>{viewModel.startDate.toLocaleDateString()}</Text>
               <AntDesign name="calendar" size={18} color="black" />
             </TouchableOpacity>
           </View>
+          
+          {viewModel.reportType !== 'daily' && (
+            <View style={styles.datePickerRow}>
+              <Text style={styles.dateLabel}>শেষের তারিখ:</Text>
+              <TouchableOpacity 
+                style={styles.datePickerButton}
+                onPress={() => viewModel.setShowEndDatePicker(true)}
+              >
+                <Text>{viewModel.endDate.toLocaleDateString()}</Text>
+                <AntDesign name="calendar" size={18} color="black" />
+              </TouchableOpacity>
+            </View>
+          )}
+          
+          {viewModel.showStartDatePicker && (
+            <DateTimePicker
+              value={viewModel.startDate}
+              mode="date"
+              display="default"
+              onChange={viewModel.onStartDateChange}
+            />
+          )}
+          
+          {viewModel.showEndDatePicker && (
+            <DateTimePicker
+              value={viewModel.endDate}
+              mode="date"
+              display="default"
+              onChange={viewModel.onEndDateChange}
+            />
+          )}
+        </View>
+        
+        {viewModel.loading ? (
+          <ActivityIndicator size="large" color="#0066cc" style={styles.loader} />
+        ) : (
+          <>
+            <View style={styles.summaryContainer}>
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryLabel}>মোট বিক্রয়</Text>
+                <Text style={styles.summaryValue}>{viewModel.totalSales} টাকা</Text>
+              </View>
+              
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryLabel}>মোট লাভ</Text>
+                <Text style={styles.summaryValue}>{viewModel.totalProfit} টাকা</Text>
+              </View>
+              
+              <View style={styles.summaryCard}>
+                <Text style={styles.summaryLabel}>মোট অর্ডার</Text>
+                <Text style={styles.summaryValue}>{viewModel.salesData.length}</Text>
+              </View>
+            </View>
+            
+            <LineChart data={viewModel.chartData} labels={viewModel.chartLabels} />
+            
+            <View style={styles.topProductsContainer}>
+              <Text style={styles.topProductsTitle}>সর্বাধিক বিক্রিত পণ্য</Text>
+              
+              {viewModel.topProducts.length > 0 ? (
+                viewModel.topProducts.map((product, index) => (
+                  <View key={index} style={styles.topProductItem}>
+                    <Text style={styles.topProductRank}>{index + 1}</Text>
+                    <View style={styles.topProductDetails}>
+                      <Text style={styles.topProductName}>{product.name}</Text>
+                      <Text style={styles.topProductQuantity}>পরিমাণ: {product.quantity}</Text>
+                    </View>
+                    <Text style={styles.topProductRevenue}>{product.revenue} টাকা</Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.noDataText}>এই সময়ে কোন বিক্রয় নেই</Text>
+              )}
+            </View>
+            
+            <View style={styles.detailsContainer}>
+              <Text style={styles.detailsTitle}>বিক্রয়ের তালিকা</Text>
+              
+              {viewModel.salesData.length > 0 ? (
+                viewModel.salesData.map((sale, index) => (
+                  <View key={index} style={styles.saleItem}>
+                    <View style={styles.saleHeader}>
+                      <Text style={styles.saleDate}>
+                        {new Date(sale.date).toLocaleDateString()} {new Date(sale.date).toLocaleTimeString()}
+                      </Text>
+                      <Text style={styles.saleAmount}>{sale.totalAmount} টাকা</Text>
+                    </View>
+                    
+                    <View style={styles.saleDetails}>
+                      <Text>কাস্টমার: {sale.customerName || 'অজানা'}</Text>
+                      <Text>পণ্য: {sale.items.length}টি</Text>
+                      <Text>লাভ: {sale.totalProfit} টাকা</Text>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.noDataText}>এই সময়ে কোন বিক্রয় নেই</Text>
+              )}
+            </View>
+          </>
         )}
         
-        {showStartDatePicker && (
-          <DateTimePicker
-            value={startDate}
-            mode="date"
-            display="default"
-            onChange={onStartDateChange}
-          />
-        )}
-        
-        {showEndDatePicker && (
-          <DateTimePicker
-            value={endDate}
-            mode="date"
-            display="default"
-            onChange={onEndDateChange}
-          />
-        )}
-      </View>
-      
-      {loading ? (
-        <ActivityIndicator size="large" color="#0066cc" style={styles.loader} />
-      ) : (
-        <>
-          <View style={styles.summaryContainer}>
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>মোট বিক্রয়</Text>
-              <Text style={styles.summaryValue}>{totalSales} টাকা</Text>
-            </View>
-            
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>মোট লাভ</Text>
-              <Text style={styles.summaryValue}>{totalProfit} টাকা</Text>
-            </View>
-            
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>মোট অর্ডার</Text>
-              <Text style={styles.summaryValue}>{salesData.length}</Text>
-            </View>
-          </View>
-          
-          <LineChart data={chartData} labels={chartLabels} />
-          
-          <View style={styles.topProductsContainer}>
-            <Text style={styles.topProductsTitle}>সর্বাধিক বিক্রিত পণ্য</Text>
-            
-            {topProducts.length > 0 ? (
-              topProducts.map((product, index) => (
-                <View key={index} style={styles.topProductItem}>
-                  <Text style={styles.topProductRank}>{index + 1}</Text>
-                  <View style={styles.topProductDetails}>
-                    <Text style={styles.topProductName}>{product.name}</Text>
-                    <Text style={styles.topProductQuantity}>পরিমাণ: {product.quantity}</Text>
-                  </View>
-                  <Text style={styles.topProductRevenue}>{product.revenue} টাকা</Text>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.noDataText}>এই সময়ে কোন বিক্রয় নেই</Text>
-            )}
-          </View>
-          
-          <View style={styles.detailsContainer}>
-            <Text style={styles.detailsTitle}>বিক্রয়ের তালিকা</Text>
-            
-            {salesData.length > 0 ? (
-              salesData.map((sale, index) => (
-                <View key={index} style={styles.saleItem}>
-                  <View style={styles.saleHeader}>
-                    <Text style={styles.saleDate}>
-                      {new Date(sale.date).toLocaleDateString()} {new Date(sale.date).toLocaleTimeString()}
-                    </Text>
-                    <Text style={styles.saleAmount}>{sale.totalAmount} টাকা</Text>
-                  </View>
-                  
-                  <View style={styles.saleDetails}>
-                    <Text>কাস্টমার: {sale.customerName || 'অজানা'}</Text>
-                    <Text>পণ্য: {sale.items.length}টি</Text>
-                    <Text>লাভ: {sale.totalProfit} টাকা</Text>
-                  </View>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.noDataText}>এই সময়ে কোন বিক্রয় নেই</Text>
-            )}
-          </View>
-        </>
-      )}
-    </ScrollView>
+        <View style={styles.spacer} />
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: '#f7f7f7',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: '#fff',
-    elevation: 2,
-  },
-  backButton: {
-    marginRight: 10,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  container: {
     flex: 1,
-    textAlign: 'center',
+    backgroundColor: '#f7f7f7',
   },
   headerActions: {
     flexDirection: 'row',
@@ -952,6 +974,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginVertical: 20,
     color: '#666',
+  },
+  spacer: {
+    height: 20,
   },
 });
 

@@ -2,7 +2,6 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface HeaderProps {
   title: string;
@@ -11,6 +10,7 @@ interface HeaderProps {
   rightComponent?: React.ReactNode;
   backgroundColor?: string;
   textColor?: string;
+  onMenuPress?: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -20,8 +20,17 @@ const Header: React.FC<HeaderProps> = ({
   rightComponent,
   backgroundColor = '#1565C0',
   textColor = '#fff',
+  onMenuPress,
 }) => {
   const navigation = useNavigation();
+
+  const handleMenuPress = () => {
+    if (onMenuPress) {
+      onMenuPress();
+    } else {
+      navigation.dispatch(DrawerActions.toggleDrawer());
+    }
+  };
 
   return (
     <View style={[styles.header, { backgroundColor }]}>
@@ -38,7 +47,7 @@ const Header: React.FC<HeaderProps> = ({
         ) : showMenuButton ? (
           <TouchableOpacity 
             style={styles.menuButton}
-            onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+            onPress={handleMenuPress}
           >
             <Ionicons name="menu" size={24} color={textColor} />
           </TouchableOpacity>
@@ -47,7 +56,7 @@ const Header: React.FC<HeaderProps> = ({
         )}
       </View>
       
-      <Text style={[styles.headerTitle, { color: textColor }]}>{title}</Text>
+      <Text style={[styles.headerTitle, { color: textColor }]} numberOfLines={1}>{title}</Text>
       
       <View style={styles.rightContainer}>
         {rightComponent || <View style={styles.placeholderRight} />}

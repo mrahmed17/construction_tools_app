@@ -163,10 +163,10 @@ function DrawerNavigator() {
           width: 280,
         },
         drawerType: 'front',
-        swipeEnabled: Platform.OS === 'ios' ? false : true,
+        swipeEnabled: false,
         drawerActiveTintColor: '#1565C0',
         drawerInactiveTintColor: '#555',
-        swipeEdgeWidth: Platform.OS === 'ios' ? 0 : 100,
+        swipeEdgeWidth: 0,
       }}
       drawerContent={(props) => <CustomDrawerContent {...props} />}
     >

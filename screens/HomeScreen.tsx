@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Alert,
   Image,
-  SafeAreaView,
   RefreshControl,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -17,6 +16,8 @@ import { useProducts } from '../context/ProductContext';
 import { useCart } from '../context/CartContext';
 import { useCustomer } from '../context/CustomerContext';
 import { formatCurrency } from '../utils/helpers';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Header from '../components/Header';
 
 // MVVM architecture: ViewModel for the HomeScreen
 const useHomeViewModel = () => {
@@ -281,23 +282,27 @@ const HomeScreen = () => {
   const navigation = useNavigation();
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={viewModel.openDrawer}>
-          <Ionicons name="menu" size={30} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>ঘর তৈরির সরঞ্জাম</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Cart' as never)}>
-          <View style={styles.cartIconContainer}>
-            <Ionicons name="cart-outline" size={28} color="#333" />
-            {viewModel.cartItems && viewModel.cartItems.length > 0 && (
-              <View style={styles.cartBadge}>
-                <Text style={styles.cartBadgeText}>{viewModel.cartItems.length}</Text>
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      {/* Header */}
+      <Header 
+        title="ঘর তৈরির সরঞ্জাম" 
+        showBackButton={false} 
+        showMenuButton={true} 
+        backgroundColor="#1565C0"
+        textColor="#fff"
+        rightComponent={
+          <TouchableOpacity onPress={() => navigation.navigate('Cart')}>
+            <View style={styles.cartIconContainer}>
+              <Ionicons name="cart-outline" size={28} color="#fff" />
+              {viewModel.cartItems && viewModel.cartItems.length > 0 && (
+                <View style={styles.cartBadge}>
+                  <Text style={styles.cartBadgeText}>{viewModel.cartItems.length}</Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+        }
+      />
 
       <ScrollView 
         style={styles.container}
