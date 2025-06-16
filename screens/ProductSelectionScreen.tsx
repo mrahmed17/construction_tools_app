@@ -10,8 +10,10 @@ import {
   Alert,
   ActivityIndicator,
   SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import { AntDesign, MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { AntDesign, MaterialIcons, Ionicons, FontAwesome } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useProducts, Category, Company, ProductType, Product } from '../context/ProductContext';
 import { useCart } from '../context/CartContext';
@@ -30,6 +32,11 @@ const useProductSelectionViewModel = () => {
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedThickness, setSelectedThickness] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  
+  // Price information
+  const [purchasePrice, setPurchasePrice] = useState<string>('0');
+  const [salePrice, setSalePrice] = useState<string>('0');
+  const [profit, setProfit] = useState<number>(0);
   
   // Modals
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
@@ -50,8 +57,20 @@ const useProductSelectionViewModel = () => {
     color: string | null,
     thickness: string | null,
     size: string | null,
-    quantity: string
+    quantity: string,
+    purchasePrice: number,
+    salePrice: number,
+    profit: number
   }>>([]);
+  
+  // Calculate profit when purchase or sale price changes
+  useEffect(() => {
+    const purchase = parseFloat(purchasePrice) || 0;
+    const sale = parseFloat(salePrice) || 0;
+    const qty = parseInt(quantity) || 1;
+    
+    setProfit((sale - purchase) * qty);
+  }, [purchasePrice, salePrice, quantity]);
   
   // Reset all selections
   const resetSelections = useCallback(() => {
@@ -62,6 +81,9 @@ const useProductSelectionViewModel = () => {
     setSelectedThickness(null);
     setSelectedSize(null);
     setQuantity('1');
+    setPurchasePrice('0');
+    setSalePrice('0');
+    setProfit(0);
   }, []);
   
   // Add current selection to entries
@@ -99,6 +121,19 @@ const useProductSelectionViewModel = () => {
       return;
     }
     
+    const purchase = parseFloat(purchasePrice);
+    const sale = parseFloat(salePrice);
+    
+    if (isNaN(purchase) || purchase < 0) {
+      Alert.alert('ত্রুটি', 'ক্রয় মূল্য সঠিক নয়।');
+      return;
+    }
+    
+    if (isNaN(sale) || sale < 0) {
+      Alert.alert('ত্রুটি', 'বিক্রয় মূল্য সঠিক নয়।');
+      return;
+    }
+    
     const newEntry = {
       category: selectedCategory,
       company: selectedCompany,
@@ -106,7 +141,10 @@ const useProductSelectionViewModel = () => {
       color: selectedColor,
       thickness: selectedThickness,
       size: selectedSize,
-      quantity
+      quantity,
+      purchasePrice: purchase,
+      salePrice: sale,
+      profit: (sale - purchase) * qty
     };
     
     setProductEntries(prev => [...prev, newEntry]);
@@ -123,6 +161,8 @@ const useProductSelectionViewModel = () => {
     selectedThickness, 
     selectedSize, 
     quantity, 
+    purchasePrice,
+    salePrice,
     resetSelections
   ]);
   
@@ -165,8 +205,8 @@ const useProductSelectionViewModel = () => {
           color: entry.color || undefined,
           thickness: entry.thickness || '',
           size: entry.size || '',
-          purchasePrice: 0, // Default price, will be updated in cart
-          salePrice: 0, // Default price, will be updated in cart
+          purchasePrice: entry.purchasePrice,
+          salePrice: entry.salePrice,
           stock: 100, // Default stock
           quantity: parseInt(entry.quantity)
         };
@@ -176,6 +216,8 @@ const useProductSelectionViewModel = () => {
         // If we found a matching product, add it to cart
         addToCart({
           ...matchingProduct,
+          purchasePrice: entry.purchasePrice,
+          salePrice: entry.salePrice,
           quantity: parseInt(entry.quantity)
         });
       }
@@ -258,6 +300,11 @@ const useProductSelectionViewModel = () => {
     setSelectedSize(null);
   }, [selectedProductType]);
 
+  // Format currency
+  const formatCurrency = useCallback((amount: number) => {
+    return `৳${amount.toLocaleString('bn-BD')}`;
+  }, []);
+
   // Increment quantity
   const incrementQuantity = useCallback(() => {
     const current = parseInt(quantity);
@@ -271,6 +318,11 @@ const useProductSelectionViewModel = () => {
       setQuantity((current - 1).toString());
     }
   }, [quantity]);
+
+  // Calculate total profit for all entries
+  const calculateTotalProfit = useCallback(() => {
+    return productEntries.reduce((total, entry) => total + entry.profit, 0);
+  }, [productEntries]);
 
   return {
     loading,
@@ -287,6 +339,11 @@ const useProductSelectionViewModel = () => {
     setSelectedThickness,
     selectedSize,
     setSelectedSize,
+    purchasePrice,
+    setPurchasePrice,
+    salePrice,
+    setSalePrice,
+    profit,
     quantity,
     setQuantity,
     incrementQuantity,
@@ -308,7 +365,9 @@ const useProductSelectionViewModel = () => {
     removeProductEntry,
     addAllToCart,
     getThicknessOptions,
-    getSizeOptions
+    getSizeOptions,
+    formatCurrency,
+    calculateTotalProfit
   };
 };
 
@@ -328,401 +387,456 @@ const ProductSelectionScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container}>
-        <Header title="পণ্য নির্বাচন করুন" showBackButton={true} />
-        
-        <View style={styles.selectionContainer}>
-          {/* Category Selection */}
-          <View style={styles.selectionRow}>
-            <Text style={styles.selectionLabel}>ক্যাটাগরি:</Text>
-            <TouchableOpacity
-              style={styles.selectionButton}
-              onPress={() => viewModel.setCategoryModalVisible(true)}
-            >
-              <Text style={styles.selectionText}>
-                {viewModel.selectedCategory ? viewModel.selectedCategory.name : "ক্যাটাগরি নির্বাচন করুন"}
-              </Text>
-              <AntDesign name="down" size={16} color="#666" />
-            </TouchableOpacity>
-          </View>
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoidingContainer} 
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+      >
+        <ScrollView style={styles.container}>
+          <Header title="পণ্য নির্বাচন করুন" showBackButton={true} />
           
-          {/* Company Selection - Only show if category has companies */}
-          {viewModel.selectedCategory && Array.isArray(viewModel.selectedCategory.companies) && viewModel.selectedCategory.companies.length > 0 && (
+          <View style={styles.selectionContainer}>
+            {/* Category Selection */}
             <View style={styles.selectionRow}>
-              <Text style={styles.selectionLabel}>কোম্পানি:</Text>
+              <Text style={styles.selectionLabel}>ক্যাটাগরি:</Text>
               <TouchableOpacity
                 style={styles.selectionButton}
-                onPress={() => viewModel.setCompanyModalVisible(true)}
+                onPress={() => viewModel.setCategoryModalVisible(true)}
               >
                 <Text style={styles.selectionText}>
-                  {viewModel.selectedCompany ? viewModel.selectedCompany.name : "কোম্পানি নির্বাচন করুন"}
+                  {viewModel.selectedCategory ? viewModel.selectedCategory.name : "ক্যাটাগরি নির্বাচন করুন"}
                 </Text>
                 <AntDesign name="down" size={16} color="#666" />
               </TouchableOpacity>
             </View>
-          )}
-          
-          {/* Product Type Selection - Show based on whether we have company or direct product types */}
-          {((viewModel.selectedCompany && Array.isArray(viewModel.selectedCompany.productTypes) && viewModel.selectedCompany.productTypes.length > 0) ||
-            (viewModel.selectedCategory && !viewModel.selectedCompany && viewModel.selectedCategory.productTypes && viewModel.selectedCategory.productTypes.length > 0)) && (
-            <View style={styles.selectionRow}>
-              <Text style={styles.selectionLabel}>প্রোডাক্ট টাইপ:</Text>
-              <TouchableOpacity
-                style={styles.selectionButton}
-                onPress={() => viewModel.setProductTypeModalVisible(true)}
-              >
-                <Text style={styles.selectionText}>
-                  {viewModel.selectedProductType ? viewModel.selectedProductType.name : "প্রোডাক্ট টাইপ নির্বাচন করুন"}
-                </Text>
-                <AntDesign name="down" size={16} color="#666" />
-              </TouchableOpacity>
-            </View>
-          )}
-          
-          {/* Color Selection - Only show if product type has colors */}
-          {viewModel.selectedProductType && viewModel.selectedProductType.hasColors && (
-            <View style={styles.selectionRow}>
-              <Text style={styles.selectionLabel}>কালার:</Text>
-              <TouchableOpacity
-                style={styles.selectionButton}
-                onPress={() => viewModel.setColorModalVisible(true)}
-              >
-                <Text style={styles.selectionText}>
-                  {viewModel.selectedColor || "কালার নির্বাচন করুন"}
-                </Text>
-                <AntDesign name="down" size={16} color="#666" />
-              </TouchableOpacity>
-            </View>
-          )}
-          
-          {/* Thickness Selection - Only show if product type has thickness options */}
-          {viewModel.selectedProductType && (viewModel.selectedProductType.thicknessRange || viewModel.selectedProductType.thicknessOptions) && (
-            <View style={styles.selectionRow}>
-              <Text style={styles.selectionLabel}>পুরুত্ব:</Text>
-              <TouchableOpacity
-                style={styles.selectionButton}
-                onPress={() => viewModel.setThicknessModalVisible(true)}
-              >
-                <Text style={styles.selectionText}>
-                  {viewModel.selectedThickness || "পুরুত্ব নির্বাচন করুন"}
-                </Text>
-                <AntDesign name="down" size={16} color="#666" />
-              </TouchableOpacity>
-            </View>
-          )}
-          
-          {/* Size Selection - Only show if product type has size range */}
-          {viewModel.selectedProductType && viewModel.selectedProductType.sizeRange && (
-            <View style={styles.selectionRow}>
-              <Text style={styles.selectionLabel}>সাইজ:</Text>
-              <TouchableOpacity
-                style={styles.selectionButton}
-                onPress={() => viewModel.setSizeModalVisible(true)}
-              >
-                <Text style={styles.selectionText}>
-                  {viewModel.selectedSize || "সাইজ নির্বাচন করুন"}
-                </Text>
-                <AntDesign name="down" size={16} color="#666" />
-              </TouchableOpacity>
-            </View>
-          )}
-          
-          {/* Quantity Input */}
-          <View style={styles.selectionRow}>
-            <Text style={styles.selectionLabel}>পরিমাণ:</Text>
-            <View style={styles.quantityContainer}>
-              <TouchableOpacity
-                style={styles.quantityButton}
-                onPress={viewModel.decrementQuantity}
-              >
-                <AntDesign name="minus" size={18} color="#fff" />
-              </TouchableOpacity>
-              
-              <TextInput
-                style={styles.quantityInput}
-                value={viewModel.quantity}
-                onChangeText={viewModel.setQuantity}
-                keyboardType="numeric"
-              />
-              
-              <TouchableOpacity
-                style={styles.quantityButton}
-                onPress={viewModel.incrementQuantity}
-              >
-                <AntDesign name="plus" size={18} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          </View>
-          
-          {/* Add Product Button */}
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={viewModel.addProductEntry}
-          >
-            <Text style={styles.addButtonText}>পণ্য যোগ করুন</Text>
-            <AntDesign name="plus" size={18} color="#fff" />
-          </TouchableOpacity>
-        </View>
-        
-        {/* Selected Products List */}
-        {viewModel.productEntries.length > 0 && (
-          <View style={styles.selectedProductsContainer}>
-            <Text style={styles.selectedProductsTitle}>নির্বাচিত পণ্য</Text>
             
-            {viewModel.productEntries.map((entry, index) => (
-              <View key={index} style={styles.selectedProductItem}>
-                <View style={styles.selectedProductInfo}>
-                  <Text style={styles.selectedProductCategory}>
-                    {entry.category?.name}
-                  </Text>
-                  <Text style={styles.selectedProductDetails}>
-                    {entry.company?.name && `${entry.company.name}, `}
-                    {entry.productType?.name && `${entry.productType.name}, `}
-                    {entry.color && `${entry.color}, `}
-                    {entry.thickness && `${entry.thickness} মিমি, `}
-                    {entry.size}
-                  </Text>
-                  <Text style={styles.selectedProductQuantity}>
-                    পরিমাণ: {entry.quantity}
-                  </Text>
-                </View>
+            {/* Company Selection - Only show if category has companies */}
+            {viewModel.selectedCategory && Array.isArray(viewModel.selectedCategory.companies) && viewModel.selectedCategory.companies.length > 0 && (
+              <View style={styles.selectionRow}>
+                <Text style={styles.selectionLabel}>কোম্পানি:</Text>
                 <TouchableOpacity
-                  style={styles.removeButton}
-                  onPress={() => viewModel.removeProductEntry(index)}
+                  style={styles.selectionButton}
+                  onPress={() => viewModel.setCompanyModalVisible(true)}
                 >
-                  <AntDesign name="close" size={20} color="#fff" />
+                  <Text style={styles.selectionText}>
+                    {viewModel.selectedCompany ? viewModel.selectedCompany.name : "কোম্পানি নির্বাচন করুন"}
+                  </Text>
+                  <AntDesign name="down" size={16} color="#666" />
                 </TouchableOpacity>
               </View>
-            ))}
+            )}
             
+            {/* Product Type Selection - Show based on whether we have company or direct product types */}
+            {((viewModel.selectedCompany && Array.isArray(viewModel.selectedCompany.productTypes) && viewModel.selectedCompany.productTypes.length > 0) ||
+              (viewModel.selectedCategory && !viewModel.selectedCompany && viewModel.selectedCategory.productTypes && viewModel.selectedCategory.productTypes.length > 0)) && (
+              <View style={styles.selectionRow}>
+                <Text style={styles.selectionLabel}>প্রোডাক্ট টাইপ:</Text>
+                <TouchableOpacity
+                  style={styles.selectionButton}
+                  onPress={() => viewModel.setProductTypeModalVisible(true)}
+                >
+                  <Text style={styles.selectionText}>
+                    {viewModel.selectedProductType ? viewModel.selectedProductType.name : "প্রোডাক্ট টাইপ নির্বাচন করুন"}
+                  </Text>
+                  <AntDesign name="down" size={16} color="#666" />
+                </TouchableOpacity>
+              </View>
+            )}
+            
+            {/* Color Selection - Only show if product type has colors */}
+            {viewModel.selectedProductType && viewModel.selectedProductType.hasColors && (
+              <View style={styles.selectionRow}>
+                <Text style={styles.selectionLabel}>কালার:</Text>
+                <TouchableOpacity
+                  style={styles.selectionButton}
+                  onPress={() => viewModel.setColorModalVisible(true)}
+                >
+                  <Text style={styles.selectionText}>
+                    {viewModel.selectedColor || "কালার নির্বাচন করুন"}
+                  </Text>
+                  <AntDesign name="down" size={16} color="#666" />
+                </TouchableOpacity>
+              </View>
+            )}
+            
+            {/* Thickness Selection - Only show if product type has thickness options */}
+            {viewModel.selectedProductType && (viewModel.selectedProductType.thicknessRange || viewModel.selectedProductType.thicknessOptions) && (
+              <View style={styles.selectionRow}>
+                <Text style={styles.selectionLabel}>পুরুত্ব:</Text>
+                <TouchableOpacity
+                  style={styles.selectionButton}
+                  onPress={() => viewModel.setThicknessModalVisible(true)}
+                >
+                  <Text style={styles.selectionText}>
+                    {viewModel.selectedThickness ? `${viewModel.selectedThickness} মিমি` : "পুরুত্ব নির্বাচন করুন"}
+                  </Text>
+                  <AntDesign name="down" size={16} color="#666" />
+                </TouchableOpacity>
+              </View>
+            )}
+            
+            {/* Size Selection - Only show if product type has size range */}
+            {viewModel.selectedProductType && viewModel.selectedProductType.sizeRange && (
+              <View style={styles.selectionRow}>
+                <Text style={styles.selectionLabel}>সাইজ:</Text>
+                <TouchableOpacity
+                  style={styles.selectionButton}
+                  onPress={() => viewModel.setSizeModalVisible(true)}
+                >
+                  <Text style={styles.selectionText}>
+                    {viewModel.selectedSize || "সাইজ নির্বাচন করুন"}
+                  </Text>
+                  <AntDesign name="down" size={16} color="#666" />
+                </TouchableOpacity>
+              </View>
+            )}
+            
+            {/* Price Inputs */}
+            <View style={styles.priceContainer}>
+              <View style={styles.priceRow}>
+                <Text style={styles.selectionLabel}>ক্রয় মূল্য:</Text>
+                <View style={styles.priceInputContainer}>
+                  <Text style={styles.currencySymbol}>৳</Text>
+                  <TextInput
+                    style={styles.priceInput}
+                    value={viewModel.purchasePrice}
+                    onChangeText={viewModel.setPurchasePrice}
+                    keyboardType="numeric"
+                    placeholder="0"
+                  />
+                </View>
+              </View>
+              
+              <View style={styles.priceRow}>
+                <Text style={styles.selectionLabel}>বিক্রয় মূল্য:</Text>
+                <View style={styles.priceInputContainer}>
+                  <Text style={styles.currencySymbol}>৳</Text>
+                  <TextInput
+                    style={styles.priceInput}
+                    value={viewModel.salePrice}
+                    onChangeText={viewModel.setSalePrice}
+                    keyboardType="numeric"
+                    placeholder="0"
+                  />
+                </View>
+              </View>
+              
+              <View style={styles.profitRow}>
+                <Text style={styles.profitLabel}>লাভ:</Text>
+                <Text style={styles.profitValue}>{viewModel.formatCurrency(viewModel.profit)}</Text>
+              </View>
+            </View>
+            
+            {/* Quantity Input */}
+            <View style={styles.selectionRow}>
+              <Text style={styles.selectionLabel}>পরিমাণ:</Text>
+              <View style={styles.quantityContainer}>
+                <TouchableOpacity
+                  style={styles.quantityButton}
+                  onPress={viewModel.decrementQuantity}
+                >
+                  <AntDesign name="minus" size={18} color="#fff" />
+                </TouchableOpacity>
+                
+                <TextInput
+                  style={styles.quantityInput}
+                  value={viewModel.quantity}
+                  onChangeText={viewModel.setQuantity}
+                  keyboardType="numeric"
+                />
+                
+                <TouchableOpacity
+                  style={styles.quantityButton}
+                  onPress={viewModel.incrementQuantity}
+                >
+                  <AntDesign name="plus" size={18} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </View>
+            
+            {/* Add Product Button */}
             <TouchableOpacity
-              style={styles.addToCartButton}
-              onPress={viewModel.addAllToCart}
+              style={styles.addButton}
+              onPress={viewModel.addProductEntry}
             >
-              <Text style={styles.addToCartButtonText}>কার্টে যোগ করুন</Text>
-              <MaterialIcons name="shopping-cart" size={20} color="#fff" />
+              <Text style={styles.addButtonText}>পণ্য যোগ করুন</Text>
+              <AntDesign name="plus" size={18} color="#fff" />
             </TouchableOpacity>
           </View>
-        )}
-        
-        {/* Category Selection Modal */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={viewModel.categoryModalVisible}
-          onRequestClose={() => viewModel.setCategoryModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>ক্যাটাগরি নির্বাচন করুন</Text>
-              <ScrollView>
-                {Array.isArray(viewModel.categories) && viewModel.categories.map((category) => (
+          
+          {/* Selected Products List */}
+          {viewModel.productEntries.length > 0 && (
+            <View style={styles.selectedProductsContainer}>
+              <Text style={styles.selectedProductsTitle}>নির্বাচিত পণ্য</Text>
+              
+              {viewModel.productEntries.map((entry, index) => (
+                <View key={index} style={styles.selectedProductItem}>
+                  <View style={styles.selectedProductInfo}>
+                    <Text style={styles.selectedProductCategory}>
+                      {entry.category?.name}
+                    </Text>
+                    <Text style={styles.selectedProductDetails}>
+                      {entry.company?.name && `${entry.company.name}, `}
+                      {entry.productType?.name && `${entry.productType.name}, `}
+                      {entry.color && `${entry.color}, `}
+                      {entry.thickness && `${entry.thickness} মিমি, `}
+                      {entry.size}
+                    </Text>
+                    <View style={styles.selectedProductPriceRow}>
+                      <Text style={styles.selectedProductQuantity}>
+                        পরিমাণ: {entry.quantity}
+                      </Text>
+                      <Text style={styles.selectedProductPrice}>
+                        ক্রয়: {viewModel.formatCurrency(entry.purchasePrice)} | বিক্রয়: {viewModel.formatCurrency(entry.salePrice)}
+                      </Text>
+                    </View>
+                    <Text style={styles.selectedProductProfit}>
+                      লাভ: {viewModel.formatCurrency(entry.profit)}
+                    </Text>
+                  </View>
                   <TouchableOpacity
-                    key={category.id}
-                    style={styles.modalItem}
-                    onPress={() => {
-                      viewModel.setSelectedCategory(category);
-                      viewModel.setCategoryModalVisible(false);
-                    }}
+                    style={styles.removeButton}
+                    onPress={() => viewModel.removeProductEntry(index)}
                   >
-                    <Text style={styles.modalItemText}>{category.name}</Text>
+                    <AntDesign name="close" size={20} color="#fff" />
                   </TouchableOpacity>
-                ))}
-              </ScrollView>
+                </View>
+              ))}
+              
+              <View style={styles.totalProfitContainer}>
+                <Text style={styles.totalProfitLabel}>মোট লাভ:</Text>
+                <Text style={styles.totalProfitValue}>{viewModel.formatCurrency(viewModel.calculateTotalProfit())}</Text>
+              </View>
+              
               <TouchableOpacity
-                style={styles.closeModalButton}
-                onPress={() => viewModel.setCategoryModalVisible(false)}
+                style={styles.addToCartButton}
+                onPress={viewModel.addAllToCart}
               >
-                <Text style={styles.closeModalButtonText}>বাতিল</Text>
+                <Text style={styles.addToCartButtonText}>কার্টে যোগ করুন</Text>
+                <MaterialIcons name="shopping-cart" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
-          </View>
-        </Modal>
-        
-        {/* Company Selection Modal */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={viewModel.companyModalVisible}
-          onRequestClose={() => viewModel.setCompanyModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>কোম্পানি নির্বাচন করুন</Text>
-              <ScrollView>
-                {viewModel.selectedCategory && Array.isArray(viewModel.selectedCategory.companies) && viewModel.selectedCategory.companies.map((company) => (
-                  <TouchableOpacity
-                    key={company.id}
-                    style={styles.modalItem}
-                    onPress={() => {
-                      viewModel.setSelectedCompany(company);
-                      viewModel.setCompanyModalVisible(false);
-                    }}
-                  >
-                    <Text style={styles.modalItemText}>{company.name}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              <TouchableOpacity
-                style={styles.closeModalButton}
-                onPress={() => viewModel.setCompanyModalVisible(false)}
-              >
-                <Text style={styles.closeModalButtonText}>বাতিল</Text>
-              </TouchableOpacity>
+          )}
+          
+          {/* Category Selection Modal */}
+          <Modal
+            animationType="slide"
+            transparent={true}
+            visible={viewModel.categoryModalVisible}
+            onRequestClose={() => viewModel.setCategoryModalVisible(false)}
+          >
+            <View style={styles.modalContainer}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>ক্যাটাগরি নির্বাচন করুন</Text>
+                <ScrollView>
+                  {Array.isArray(viewModel.categories) && viewModel.categories.map((category) => (
+                    <TouchableOpacity
+                      key={category.id}
+                      style={styles.modalItem}
+                      onPress={() => {
+                        viewModel.setSelectedCategory(category);
+                        viewModel.setCategoryModalVisible(false);
+                      }}
+                    >
+                      <Text style={styles.modalItemText}>{category.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity
+                  style={styles.closeModalButton}
+                  onPress={() => viewModel.setCategoryModalVisible(false)}
+                >
+                  <Text style={styles.closeModalButtonText}>বাতিল</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </Modal>
-        
-        {/* Product Type Selection Modal */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={viewModel.productTypeModalVisible}
-          onRequestClose={() => viewModel.setProductTypeModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>প্রোডাক্ট টাইপ নির্বাচন করুন</Text>
-              <ScrollView>
-                {viewModel.selectedCompany && Array.isArray(viewModel.selectedCompany.productTypes) && viewModel.selectedCompany.productTypes.map((type) => (
-                  <TouchableOpacity
-                    key={type.id}
-                    style={styles.modalItem}
-                    onPress={() => {
-                      viewModel.setSelectedProductType(type);
-                      viewModel.setProductTypeModalVisible(false);
-                    }}
-                  >
-                    <Text style={styles.modalItemText}>{type.name}</Text>
-                    {type.hasColors && <Text style={styles.modalItemSubtext}>(কালার অপশন আছে)</Text>}
-                  </TouchableOpacity>
-                ))}
-                {viewModel.selectedCategory && !viewModel.selectedCompany && viewModel.selectedCategory.productTypes && viewModel.selectedCategory.productTypes.map((type) => (
-                  <TouchableOpacity
-                    key={type.id}
-                    style={styles.modalItem}
-                    onPress={() => {
-                      viewModel.setSelectedProductType(type);
-                      viewModel.setProductTypeModalVisible(false);
-                    }}
-                  >
-                    <Text style={styles.modalItemText}>{type.name}</Text>
-                    {type.hasColors && <Text style={styles.modalItemSubtext}>(কালার অপশন আছে)</Text>}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              <TouchableOpacity
-                style={styles.closeModalButton}
-                onPress={() => viewModel.setProductTypeModalVisible(false)}
-              >
-                <Text style={styles.closeModalButtonText}>বাতিল</Text>
-              </TouchableOpacity>
+          </Modal>
+          
+          {/* Company Selection Modal */}
+          <Modal
+            animationType="slide"
+            transparent={true}
+            visible={viewModel.companyModalVisible}
+            onRequestClose={() => viewModel.setCompanyModalVisible(false)}
+          >
+            <View style={styles.modalContainer}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>কোম্পানি নির্বাচন করুন</Text>
+                <ScrollView>
+                  {viewModel.selectedCategory && Array.isArray(viewModel.selectedCategory.companies) && viewModel.selectedCategory.companies.map((company) => (
+                    <TouchableOpacity
+                      key={company.id}
+                      style={styles.modalItem}
+                      onPress={() => {
+                        viewModel.setSelectedCompany(company);
+                        viewModel.setCompanyModalVisible(false);
+                      }}
+                    >
+                      <Text style={styles.modalItemText}>{company.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity
+                  style={styles.closeModalButton}
+                  onPress={() => viewModel.setCompanyModalVisible(false)}
+                >
+                  <Text style={styles.closeModalButtonText}>বাতিল</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </Modal>
-        
-        {/* Color Selection Modal */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={viewModel.colorModalVisible}
-          onRequestClose={() => viewModel.setColorModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>কালার নির্বাচন করুন</Text>
-              <ScrollView>
-                {viewModel.selectedProductType && viewModel.selectedProductType.colors && viewModel.selectedProductType.colors.map((color, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.modalItem}
-                    onPress={() => {
-                      viewModel.setSelectedColor(color);
-                      viewModel.setColorModalVisible(false);
-                    }}
-                  >
-                    <Text style={styles.modalItemText}>{color}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              <TouchableOpacity
-                style={styles.closeModalButton}
-                onPress={() => viewModel.setColorModalVisible(false)}
-              >
-                <Text style={styles.closeModalButtonText}>বাতিল</Text>
-              </TouchableOpacity>
+          </Modal>
+          
+          {/* Product Type Selection Modal */}
+          <Modal
+            animationType="slide"
+            transparent={true}
+            visible={viewModel.productTypeModalVisible}
+            onRequestClose={() => viewModel.setProductTypeModalVisible(false)}
+          >
+            <View style={styles.modalContainer}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>প্রোডাক্ট টাইপ নির্বাচন করুন</Text>
+                <ScrollView>
+                  {viewModel.selectedCompany && Array.isArray(viewModel.selectedCompany.productTypes) && viewModel.selectedCompany.productTypes.map((type) => (
+                    <TouchableOpacity
+                      key={type.id}
+                      style={styles.modalItem}
+                      onPress={() => {
+                        viewModel.setSelectedProductType(type);
+                        viewModel.setProductTypeModalVisible(false);
+                      }}
+                    >
+                      <Text style={styles.modalItemText}>{type.name}</Text>
+                      {type.hasColors && <Text style={styles.modalItemSubtext}>(কালার অপশন আছে)</Text>}
+                    </TouchableOpacity>
+                  ))}
+                  {viewModel.selectedCategory && !viewModel.selectedCompany && viewModel.selectedCategory.productTypes && viewModel.selectedCategory.productTypes.map((type) => (
+                    <TouchableOpacity
+                      key={type.id}
+                      style={styles.modalItem}
+                      onPress={() => {
+                        viewModel.setSelectedProductType(type);
+                        viewModel.setProductTypeModalVisible(false);
+                      }}
+                    >
+                      <Text style={styles.modalItemText}>{type.name}</Text>
+                      {type.hasColors && <Text style={styles.modalItemSubtext}>(কালার অপশন আছে)</Text>}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity
+                  style={styles.closeModalButton}
+                  onPress={() => viewModel.setProductTypeModalVisible(false)}
+                >
+                  <Text style={styles.closeModalButtonText}>বাতিল</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </Modal>
-        
-        {/* Thickness Selection Modal */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={viewModel.thicknessModalVisible}
-          onRequestClose={() => viewModel.setThicknessModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>পুরুত্ব নির্বাচন করুন</Text>
-              <ScrollView>
-                {viewModel.getThicknessOptions().map((thickness, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.modalItem}
-                    onPress={() => {
-                      viewModel.setSelectedThickness(thickness);
-                      viewModel.setThicknessModalVisible(false);
-                    }}
-                  >
-                    <Text style={styles.modalItemText}>{thickness} মিমি</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              <TouchableOpacity
-                style={styles.closeModalButton}
-                onPress={() => viewModel.setThicknessModalVisible(false)}
-              >
-                <Text style={styles.closeModalButtonText}>বাতিল</Text>
-              </TouchableOpacity>
+          </Modal>
+          
+          {/* Color Selection Modal */}
+          <Modal
+            animationType="slide"
+            transparent={true}
+            visible={viewModel.colorModalVisible}
+            onRequestClose={() => viewModel.setColorModalVisible(false)}
+          >
+            <View style={styles.modalContainer}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>কালার নির্বাচন করুন</Text>
+                <ScrollView>
+                  {viewModel.selectedProductType && viewModel.selectedProductType.colors && viewModel.selectedProductType.colors.map((color, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.modalItem}
+                      onPress={() => {
+                        viewModel.setSelectedColor(color);
+                        viewModel.setColorModalVisible(false);
+                      }}
+                    >
+                      <Text style={styles.modalItemText}>{color}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity
+                  style={styles.closeModalButton}
+                  onPress={() => viewModel.setColorModalVisible(false)}
+                >
+                  <Text style={styles.closeModalButtonText}>বাতিল</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </Modal>
-        
-        {/* Size Selection Modal */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={viewModel.sizeModalVisible}
-          onRequestClose={() => viewModel.setSizeModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>সাইজ নির্বাচন করুন</Text>
-              <ScrollView>
-                {viewModel.getSizeOptions().map((size, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.modalItem}
-                    onPress={() => {
-                      viewModel.setSelectedSize(size);
-                      viewModel.setSizeModalVisible(false);
-                    }}
-                  >
-                    <Text style={styles.modalItemText}>{size}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-              <TouchableOpacity
-                style={styles.closeModalButton}
-                onPress={() => viewModel.setSizeModalVisible(false)}
-              >
-                <Text style={styles.closeModalButtonText}>বাতিল</Text>
-              </TouchableOpacity>
+          </Modal>
+          
+          {/* Thickness Selection Modal */}
+          <Modal
+            animationType="slide"
+            transparent={true}
+            visible={viewModel.thicknessModalVisible}
+            onRequestClose={() => viewModel.setThicknessModalVisible(false)}
+          >
+            <View style={styles.modalContainer}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>পুরুত্ব নির্বাচন করুন</Text>
+                <ScrollView>
+                  {viewModel.getThicknessOptions().map((thickness, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.modalItem}
+                      onPress={() => {
+                        viewModel.setSelectedThickness(thickness);
+                        viewModel.setThicknessModalVisible(false);
+                      }}
+                    >
+                      <Text style={styles.modalItemText}>{thickness} মিমি</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity
+                  style={styles.closeModalButton}
+                  onPress={() => viewModel.setThicknessModalVisible(false)}
+                >
+                  <Text style={styles.closeModalButtonText}>বাতিল</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </Modal>
-      </ScrollView>
+          </Modal>
+          
+          {/* Size Selection Modal */}
+          <Modal
+            animationType="slide"
+            transparent={true}
+            visible={viewModel.sizeModalVisible}
+            onRequestClose={() => viewModel.setSizeModalVisible(false)}
+          >
+            <View style={styles.modalContainer}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>সাইজ নির্বাচন করুন</Text>
+                <ScrollView>
+                  {viewModel.getSizeOptions().map((size, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.modalItem}
+                      onPress={() => {
+                        viewModel.setSelectedSize(size);
+                        viewModel.setSizeModalVisible(false);
+                      }}
+                    >
+                      <Text style={styles.modalItemText}>{size}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity
+                  style={styles.closeModalButton}
+                  onPress={() => viewModel.setSizeModalVisible(false)}
+                >
+                  <Text style={styles.closeModalButtonText}>বাতিল</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -731,6 +845,9 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  keyboardAvoidingContainer: {
+    flex: 1,
   },
   container: {
     flex: 1,
@@ -788,6 +905,54 @@ const styles = StyleSheet.create({
   selectionText: {
     fontSize: 16,
     color: '#333',
+  },
+  priceContainer: {
+    backgroundColor: '#f5f5f5',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  priceRow: {
+    marginBottom: 12,
+  },
+  priceInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 6,
+    backgroundColor: '#fff',
+  },
+  currencySymbol: {
+    paddingHorizontal: 12,
+    fontSize: 16,
+    color: '#666',
+    borderRightWidth: 1,
+    borderRightColor: '#ccc',
+  },
+  priceInput: {
+    flex: 1,
+    padding: 12,
+    fontSize: 16,
+  },
+  profitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#ddd',
+  },
+  profitLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#388e3c',
+  },
+  profitValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#388e3c',
   },
   quantityContainer: {
     flexDirection: 'row',
@@ -861,9 +1026,24 @@ const styles = StyleSheet.create({
     color: '#666',
     marginVertical: 4,
   },
+  selectedProductPriceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
   selectedProductQuantity: {
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  selectedProductPrice: {
+    fontSize: 14,
+    color: '#666',
+  },
+  selectedProductProfit: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#388e3c',
+    marginTop: 4,
   },
   removeButton: {
     backgroundColor: '#F44336',
@@ -873,6 +1053,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 15,
     marginLeft: 8,
+  },
+  totalProfitContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  totalProfitLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#388e3c',
+  },
+  totalProfitValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#388e3c',
   },
   addToCartButton: {
     backgroundColor: '#2196F3',
