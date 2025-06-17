@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function CustomDrawerContent(props) {
@@ -9,20 +9,35 @@ export default function CustomDrawerContent(props) {
   
   // Menu items with icons
   const menuItems = [
-    { name: 'Dashboard', icon: 'home-outline', screen: 'Home' },
-    { name: 'Products', icon: 'cube-outline', screen: 'Products' },
-    { name: 'Suppliers', icon: 'people-outline', screen: 'Suppliers' },
-    { name: 'Customers', icon: 'person-outline', screen: 'Customers' },
-    { name: 'Sales', icon: 'cart-outline', screen: 'Sales' },
-    { name: 'Reports', icon: 'bar-chart-outline', screen: 'Reports' },
-    { name: 'Settings', icon: 'settings-outline', screen: 'Settings' },
+    { name: 'ড্যাশবোর্ড', icon: 'home-outline', iconType: 'ionicon', screen: 'Home' },
+    { name: 'পণ্য নির্বাচন', icon: 'shopping-cart', iconType: 'material', screen: 'ProductSelection' },
+    { name: 'পণ্য ব্যবস্থাপনা', icon: 'cube-outline', iconType: 'ionicon', screen: 'ProductManagement' },
+    { name: 'কার্ট', icon: 'cart-outline', iconType: 'ionicon', screen: 'Cart' },
+    { name: 'সাপ্লাইয়ার', icon: 'people-outline', iconType: 'ionicon', screen: 'Suppliers' },
+    { name: 'কাস্টমার', icon: 'person-outline', iconType: 'ionicon', screen: 'Customers' },
+    { name: 'বিক্রয়', icon: 'cash-register', iconType: 'fontawesome', screen: 'Sales' },
+    { name: 'রিপোর্ট', icon: 'bar-chart-outline', iconType: 'ionicon', screen: 'Reports' },
+    { name: 'সেটিংস', icon: 'settings-outline', iconType: 'ionicon', screen: 'Settings' },
   ];
+
+  // Render the appropriate icon based on the icon type
+  const renderIcon = (item) => {
+    switch (item.iconType) {
+      case 'material':
+        return <MaterialIcons name={item.icon} size={24} color="#555" />;
+      case 'fontawesome':
+        return <FontAwesome5 name={item.icon} size={22} color="#555" />;
+      case 'ionicon':
+      default:
+        return <Ionicons name={item.icon} size={24} color="#555" />;
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.storeName}>Construction Materials</Text>
-        <Text style={styles.storeSubtitle}>Inventory Management</Text>
+        <Text style={styles.storeName}>ঘর তৈরির সরঞ্জাম</Text>
+        <Text style={styles.storeSubtitle}>ইনভেন্টরি ম্যানেজমেন্ট</Text>
       </View>
       
       <ScrollView style={styles.menuContainer}>
@@ -35,7 +50,7 @@ export default function CustomDrawerContent(props) {
               navigation.closeDrawer(); // Close drawer after navigation
             }}
           >
-            <Ionicons name={item.icon} size={24} color="#555" />
+            {renderIcon(item)}
             <Text style={styles.menuText}>{item.name}</Text>
           </TouchableOpacity>
         ))}
@@ -43,7 +58,7 @@ export default function CustomDrawerContent(props) {
       
       <TouchableOpacity style={styles.logoutButton}>
         <Ionicons name="log-out-outline" size={24} color="#fff" />
-        <Text style={styles.logoutText}>Logout</Text>
+        <Text style={styles.logoutText}>লগআউট</Text>
       </TouchableOpacity>
     </SafeAreaView>
   );

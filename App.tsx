@@ -6,6 +6,9 @@ import { StyleSheet, Platform, View, Text } from 'react-native';
 import { SafeAreaProvider } from "react-native-safe-area-context"
 import { Toaster } from 'sonner-native';
 import HomeScreen from "./screens/HomeScreen";
+import ProductSelectionScreen from "./screens/ProductSelectionScreen";
+import ProductManagementScreen from "./screens/ProductManagementScreen";
+import CartScreen from "./screens/CartScreen";
 import CustomDrawerContent from './components/CustomDrawerContent';
 
 const Stack = createNativeStackNavigator();
@@ -17,6 +20,9 @@ function MainStack() {
       headerShown: false
     }}>
       <Stack.Screen name="Home" component={HomeScreen} />
+      <Stack.Screen name="ProductSelection" component={ProductSelectionScreen} />
+      <Stack.Screen name="ProductManagement" component={ProductManagementScreen} />
+      <Stack.Screen name="Cart" component={CartScreen} />
       {/* Add other screens here */}
     </Stack.Navigator>
   );

@@ -18,7 +18,7 @@ const Header: React.FC<HeaderProps> = ({
   showBackButton = false,
   showMenuButton = true,
   rightComponent,
-  backgroundColor = '#1565C0',
+  backgroundColor = '#2c3e50',
   textColor = '#fff',
   onMenuPress,
 }) => {
@@ -70,7 +70,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
+    paddingTop: Platform.OS === 'ios' ? 16 : 16,
+    paddingBottom: 16,
     paddingHorizontal: 16,
     elevation: 4,
     shadowColor: '#000',
