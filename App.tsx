@@ -10,6 +10,10 @@ import ProductSelectionScreen from "./screens/ProductSelectionScreen";
 import ProductManagementScreen from "./screens/ProductManagementScreen";
 import CartScreen from "./screens/CartScreen";
 import CustomDrawerContent from './components/CustomDrawerContent';
+import { ProductProvider } from './context/ProductContext';
+import { CartProvider } from './context/CartContext';
+import { AuthProvider } from './context/AuthContext';
+import { CustomerProvider } from './context/CustomerContext';
 
 const Stack = createNativeStackNavigator();
 const Drawer = createDrawerNavigator();
@@ -51,10 +55,18 @@ function DrawerNavigator() {
 export default function App() {
   return (
     <SafeAreaProvider style={styles.container}>
-      <Toaster />
-      <NavigationContainer>
-        <DrawerNavigator />
-      </NavigationContainer>
+      <AuthProvider>
+        <CustomerProvider>
+          <ProductProvider>
+            <CartProvider>
+              <Toaster />
+              <NavigationContainer>
+                <DrawerNavigator />
+              </NavigationContainer>
+            </CartProvider>
+          </ProductProvider>
+        </CustomerProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }
