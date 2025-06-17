@@ -9,14 +9,12 @@ export type SupplierType = {
   id: string;
   name: string;
   phone: string;
-  address: string;
+  address?: string;
   email?: string;
   notes?: string;
-  unpaidAmount?: number;
-  lastPurchaseDate?: string;
-  company?: string;
-  balance?: number;
-  lastPurchase?: string;
+  company: string;
+  balance: number;
+  createdAt: string;
 };
 
 export type ProductType = {
@@ -229,21 +227,18 @@ export interface CustomerModel {
   name: string;
   phone: string;
   address: string;
-  totalPurchases: number;
-  lastPurchaseDate?: number;
-  creditLimit: number;
-  outstandingCredit: number;
-  history: CreditHistoryItem[];
+  creditLimit?: number;
+  outstandingBalance?: number;
+  creditHistory?: CreditHistoryItem[];
+  createdAt?: string;
 }
 
 export interface CreditHistoryItem {
   id: string;
-  date: number;
   amount: number;
+  date: string;
   type: 'purchase' | 'payment';
-  invoiceId?: string;
-  notes?: string;
-  dueDate?: number;
+  description?: string;
 }
 
 export interface MaterialEstimationResult {
@@ -261,4 +256,17 @@ export interface DailyCashRecord {
   sales: number;
   expenses: number;
   notes?: string;
+}
+
+export interface Order {
+  id: string;
+  date: string;
+  customerName: string;
+  customerPhone: string;
+  items: CartItem[];
+  totalAmount: number;
+  discount: number;
+  paidAmount: number;
+  dueAmount: number;
+  status: 'completed' | 'pending' | 'cancelled';
 }

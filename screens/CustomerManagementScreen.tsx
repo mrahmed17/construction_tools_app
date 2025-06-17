@@ -6,16 +6,20 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
-  SafeAreaView,
   Modal,
   Alert,
-  RefreshControl
+  RefreshControl,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useCustomer } from '../context/CustomerContext';
 import { CustomerModel, CreditHistoryItem } from '../types';
 import { formatCurrency, formatDate } from '../utils/helpers';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Header from '../components/Header';
+import SearchBar from '../components/SearchBar';
 
 // MVVM architecture: View Model for Customer Management operations
 const useCustomerViewModel = () => {
@@ -45,851 +49,697 @@ const useCustomerViewModel = () => {
 
   // Filtered customers based on search query
   const filteredCustomers = useMemo(() => {
-    if (!searchQuery.trim()) return customers;
+    if (!searchQuery.trim() || !customers) return customers || [];
     
     const query = searchQuery.toLowerCase();
-    return customers.filter(
-      customer => 
-        customer.name.toLowerCase().includes(query) || 
-        customer.phone.toLowerCase().includes(query)
+    return customers.filter(customer => 
+      customer.name.toLowerCase().includes(query) || 
+      customer.phone.includes(query) ||
+      customer.address.toLowerCase().includes(query)
     );
-  }, [customers, searchQuery]);
+  }, [searchQuery, customers]);
 
-  // Refresh customer data
-  const onRefresh = useCallback(async () => {
+  // Top debtors with highest outstanding balance
+  const topDebtors = useMemo(() => {
+    if (!customers) return [];
+    return [...customers]
+      .sort((a, b) => (b.outstandingBalance || 0) - (a.outstandingBalance || 0))
+      .slice(0, 5);
+  }, [customers]);
+
+  // Handle refresh
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    // In a real app with backend, we would fetch fresh data here
-    setTimeout(() => setRefreshing(false), 1000);
+    // Refresh customers data
+    setRefreshing(false);
   }, []);
 
-  // Add new customer
-  const handleAddCustomer = async () => {
-    if (!newCustomer.name || !newCustomer.phone) {
-      Alert.alert('ত্রুটি', 'নাম এবং ফোন নম্বর দিতে হবে');
+  // Handle adding new customer
+  const handleAddCustomer = useCallback(() => {
+    if (!newCustomer.name.trim() || !newCustomer.phone.trim()) {
+      Alert.alert('ত্রুটি', 'কাস্টমারের নাম এবং ফোন নম্বর প্রয়োজন।');
       return;
     }
-    
-    try {
-      const customerData = {
-        ...newCustomer,
-        creditLimit: parseFloat(newCustomer.creditLimit) || 5000
-      };
-      
-      await addCustomer(customerData);
-      
-      setNewCustomer({
-        name: '',
-        phone: '',
-        address: '',
-        creditLimit: '5000'
-      });
-      
-      setModalVisible(false);
-      Alert.alert('সফল', 'কাস্টমার যোগ করা হয়েছে');
-    } catch (err) {
-      Alert.alert('ত্রুটি', 'কাস্টমার যোগ করা যায়নি');
-    }
-  };
 
-  // Delete customer
-  const handleDeleteCustomer = (customerId: string) => {
+    const customerData = {
+      ...newCustomer,
+      id: Date.now().toString(),
+      outstandingBalance: 0,
+      creditLimit: parseFloat(newCustomer.creditLimit) || 5000,
+      creditHistory: [],
+      createdAt: new Date().toISOString()
+    };
+
+    addCustomer(customerData);
+    setNewCustomer({ name: '', phone: '', address: '', creditLimit: '5000' });
+    setModalVisible(false);
+  }, [newCustomer, addCustomer]);
+
+  // Handle updating customer
+  const handleUpdateCustomer = useCallback(() => {
+    if (!selectedCustomer) return;
+    
+    if (!selectedCustomer.name.trim() || !selectedCustomer.phone.trim()) {
+      Alert.alert('ত্রুটি', 'কাস্টমারের নাম এবং ফোন নম্বর প্রয়োজন।');
+      return;
+    }
+
+    updateCustomer(selectedCustomer);
+    setSelectedCustomer(null);
+    setModalVisible(false);
+  }, [selectedCustomer, updateCustomer]);
+
+  // Handle deleting customer
+  const handleDeleteCustomer = useCallback((customer: CustomerModel) => {
     Alert.alert(
       'নিশ্চিতকরণ',
-      'আপনি কি এই কাস্টমার মুছে ফেলতে চান?',
+      `আপনি কি "${customer.name}" কাস্টমারকে মুছে ফেলতে চান?`,
       [
         { text: 'বাতিল', style: 'cancel' },
         { 
-          text: 'হ্যাঁ', 
-          onPress: async () => {
-            await deleteCustomer(customerId);
-          }
+          text: 'মুছুন', 
+          style: 'destructive',
+          onPress: () => deleteCustomer(customer.id)
         }
       ]
     );
-  };
+  }, [deleteCustomer]);
 
-  // Record payment from customer
-  const handleRecordPayment = async () => {
+  // Handle recording payment
+  const handleRecordPayment = useCallback(() => {
     if (!selectedCustomer) return;
     
     const amount = parseFloat(paymentAmount);
     if (isNaN(amount) || amount <= 0) {
-      Alert.alert('ত্রুটি', 'সঠিক পরিমাণ দিন');
+      Alert.alert('ত্রুটি', 'একটি বৈধ পরিমাণ প্রবেশ করুন।');
       return;
     }
-    
-    try {
-      await recordPayment(selectedCustomer.id, amount, 'মেনুয়াল পেমেন্ট');
-      setPaymentAmount('');
-      setPaymentModalVisible(false);
-      Alert.alert('সফল', 'পেমেন্ট রেকর্ড করা হয়েছে');
-    } catch (err) {
-      Alert.alert('ত্রুটি', 'পেমেন্ট রেকর্ড করা যায়নি');
-    }
-  };
-  
+
+    const paymentData: CreditHistoryItem = {
+      id: Date.now().toString(),
+      amount,
+      date: new Date().toISOString(),
+      type: 'payment',
+      description: 'পেমেন্ট রেকর্ড করা হয়েছে'
+    };
+
+    recordPayment(selectedCustomer.id, paymentData);
+    setPaymentAmount('');
+    setPaymentModalVisible(false);
+    setSelectedCustomer(null);
+  }, [selectedCustomer, paymentAmount, recordPayment]);
+
   return {
-    customers: filteredCustomers,
+    customers,
+    filteredCustomers,
+    topDebtors,
     loading,
+    error,
     refreshing,
-    onRefresh,
     searchQuery,
     setSearchQuery,
     modalVisible,
     setModalVisible,
-    newCustomer,
-    setNewCustomer,
-    handleAddCustomer,
-    handleDeleteCustomer,
     selectedCustomer,
     setSelectedCustomer,
+    newCustomer,
+    setNewCustomer,
+    handleRefresh,
+    handleAddCustomer,
+    handleUpdateCustomer,
+    handleDeleteCustomer,
     paymentAmount,
     setPaymentAmount,
-    paymentModalVisible, 
+    paymentModalVisible,
     setPaymentModalVisible,
     handleRecordPayment
   };
 };
 
-// MVVM architecture: View component that uses the ViewModel
-const CustomerManagementScreen = () => {
+// Customer Management Screen Component
+export default function CustomerManagementScreen() {
   const navigation = useNavigation();
   const viewModel = useCustomerViewModel();
   
-  // Render individual customer item
+  // Render customer item
   const renderCustomerItem = ({ item }: { item: CustomerModel }) => (
     <View style={styles.customerCard}>
       <View style={styles.customerHeader}>
         <Text style={styles.customerName}>{item.name}</Text>
         <View style={[
-          styles.creditBadge,
-          item.outstandingCredit > 0 ? styles.creditBadgeWarning : styles.creditBadgeGood
+          styles.balanceBadge, 
+          (item.outstandingBalance || 0) > 0 ? styles.debtBadge : styles.noBadge
         ]}>
-          <Text style={styles.creditBadgeText}>
-            {item.outstandingCredit > 0 ? 'বাকি আছে' : 'কোন বাকি নেই'}
+          <Text style={styles.balanceText}>
+            {(item.outstandingBalance || 0) > 0 
+              ? `৳${(item.outstandingBalance || 0).toLocaleString()}`
+              : 'কোন বাকি নেই'}
           </Text>
         </View>
       </View>
       
-      <View style={styles.customerInfo}>
-        <Ionicons name="call-outline" size={16} color="#555" />
-        <Text style={styles.customerPhone}>{item.phone}</Text>
-      </View>
-      
-      {item.address ? (
-        <View style={styles.customerInfo}>
-          <Ionicons name="location-outline" size={16} color="#555" />
-          <Text style={styles.customerAddress}>{item.address}</Text>
-        </View>
-      ) : null}
-      
-      <View style={styles.creditContainer}>
-        <View style={styles.creditItem}>
-          <Text style={styles.creditLabel}>ক্রেডিট লিমিট</Text>
-          <Text style={styles.creditValue}>{formatCurrency(item.creditLimit)}</Text>
+      <View style={styles.customerDetails}>
+        <View style={styles.detailRow}>
+          <Ionicons name="call-outline" size={16} color="#555" />
+          <Text style={styles.detailText}>{item.phone}</Text>
         </View>
         
-        <View style={styles.creditItem}>
-          <Text style={styles.creditLabel}>বাকির পরিমাণ</Text>
-          <Text style={[
-            styles.creditValue,
-            item.outstandingCredit > 0 && styles.outstandingCredit
-          ]}>
-            {formatCurrency(item.outstandingCredit)}
-          </Text>
-        </View>
-      </View>
-      
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity 
-          style={styles.detailsButton}
-          onPress={() => viewModel.setSelectedCustomer(item)}
-        >
-          <Text style={styles.detailsButtonText}>বিস্তারিত</Text>
-        </TouchableOpacity>
-        
-        {item.outstandingCredit > 0 && (
-          <TouchableOpacity 
-            style={styles.paymentButton}
-            onPress={() => {
-              viewModel.setSelectedCustomer(item);
-              viewModel.setPaymentModalVisible(true);
-            }}
-          >
-            <Text style={styles.paymentButtonText}>পেমেন্ট</Text>
-          </TouchableOpacity>
+        {item.address && (
+          <View style={styles.detailRow}>
+            <Ionicons name="location-outline" size={16} color="#555" />
+            <Text style={styles.detailText}>{item.address}</Text>
+          </View>
         )}
         
+        <View style={styles.detailRow}>
+          <Ionicons name="wallet-outline" size={16} color="#555" />
+          <Text style={styles.detailText}>ক্রেডিট লিমিট: ৳{(item.creditLimit || 0).toLocaleString()}</Text>
+        </View>
+      </View>
+      
+      <View style={styles.actionRow}>
         <TouchableOpacity 
-          style={styles.deleteButton}
-          onPress={() => viewModel.handleDeleteCustomer(item.id)}
+          style={[styles.actionButton, styles.editButton]}
+          onPress={() => {
+            viewModel.setSelectedCustomer(item);
+            viewModel.setModalVisible(true);
+          }}
         >
-          <Ionicons name="trash-outline" size={18} color="#fff" />
+          <Ionicons name="create-outline" size={16} color="#fff" />
+          <Text style={styles.actionButtonText}>সম্পাদনা</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.paymentButton]}
+          onPress={() => {
+            viewModel.setSelectedCustomer(item);
+            viewModel.setPaymentModalVisible(true);
+          }}
+        >
+          <Ionicons name="cash-outline" size={16} color="#fff" />
+          <Text style={styles.actionButtonText}>পেমেন্ট</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.deleteButton]}
+          onPress={() => viewModel.handleDeleteCustomer(item)}
+        >
+          <Ionicons name="trash-outline" size={16} color="#fff" />
+          <Text style={styles.actionButtonText}>মুছুন</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
-  
-  // Render credit history item
-  const renderCreditHistoryItem = ({ item }: { item: CreditHistoryItem }) => (
-    <View style={[
-      styles.historyItem,
-      item.type === 'purchase' ? styles.purchaseItem : styles.paymentItem
-    ]}>
-      <View style={styles.historyHeader}>
-        <Text style={styles.historyType}>
-          {item.type === 'purchase' ? 'বাকি' : 'পেমেন্ট'}
-        </Text>
-        <Text style={styles.historyDate}>{formatDate(item.date)}</Text>
-      </View>
-      
-      <View style={styles.historyAmount}>
-        <Text style={[
-          styles.amountValue,
-          item.type === 'purchase' ? styles.purchaseAmount : styles.paymentAmount
-        ]}>
-          {item.type === 'purchase' ? '-' : '+'} {formatCurrency(item.amount)}
-        </Text>
-        {item.dueDate && (
-          <Text style={styles.dueDate}>
-            শোধের তারিখ: {formatDate(item.dueDate)}
-          </Text>
-        )}
-      </View>
-      
-      {item.notes && (
-        <Text style={styles.historyNotes}>{item.notes}</Text>
-      )}
-    </View>
+
+  // Render top debtor item
+  const renderDebtorItem = ({ item }: { item: CustomerModel }) => (
+    <TouchableOpacity 
+      style={styles.debtorCard}
+      onPress={() => {
+        viewModel.setSelectedCustomer(item);
+        viewModel.setPaymentModalVisible(true);
+      }}
+    >
+      <Text style={styles.debtorName}>{item.name}</Text>
+      <Text style={styles.debtorAmount}>৳{(item.outstandingBalance || 0).toLocaleString()}</Text>
+    </TouchableOpacity>
   );
-  
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>কাস্টমার ম্যানেজমেন্ট</Text>
-        <TouchableOpacity onPress={() => viewModel.setModalVisible(true)}>
-          <Ionicons name="add-circle" size={24} color="#1565C0" />
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={styles.container}>
+      <Header title="কাস্টমার ব্যবস্থাপনা" />
       
       <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
+        <SearchBar
           placeholder="কাস্টমার খুঁজুন..."
           value={viewModel.searchQuery}
           onChangeText={viewModel.setSearchQuery}
         />
+        
+        <TouchableOpacity 
+          style={styles.addButton}
+          onPress={() => {
+            viewModel.setSelectedCustomer(null);
+            viewModel.setModalVisible(true);
+          }}
+        >
+          <Ionicons name="add" size={24} color="#fff" />
+        </TouchableOpacity>
       </View>
       
+      {viewModel.topDebtors.length > 0 && (
+        <View style={styles.debtorsContainer}>
+          <Text style={styles.sectionTitle}>সর্বোচ্চ বাকিদার</Text>
+          <FlatList
+            data={viewModel.topDebtors}
+            renderItem={renderDebtorItem}
+            keyExtractor={(item) => item.id}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.debtorsList}
+          />
+        </View>
+      )}
+      
       <FlatList
-        data={viewModel.customers}
-        keyExtractor={(item) => item.id}
+        data={viewModel.filteredCustomers}
         renderItem={renderCustomerItem}
-        contentContainerStyle={styles.list}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.customersList}
         refreshControl={
-          <RefreshControl 
-            refreshing={viewModel.refreshing} 
-            onRefresh={viewModel.onRefresh} 
+          <RefreshControl
+            refreshing={viewModel.refreshing}
+            onRefresh={viewModel.handleRefresh}
+            colors={['#2c3e50']}
           />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="people" size={50} color="#ccc" />
-            <Text style={styles.emptyText}>কোন কাস্টমার নেই</Text>
-            <Text style={styles.emptySubtext}>
-              কাস্টমার যোগ করতে উপরের "+" আইকনে ক্লিক করুন
+            <Ionicons name="people-outline" size={48} color="#ccc" />
+            <Text style={styles.emptyText}>
+              {viewModel.searchQuery ? 'কোন কাস্টমার পাওয়া যায়নি' : 'কোন কাস্টমার নেই'}
             </Text>
+            <TouchableOpacity 
+              style={styles.emptyButton}
+              onPress={() => {
+                viewModel.setSelectedCustomer(null);
+                viewModel.setModalVisible(true);
+              }}
+            >
+              <Text style={styles.emptyButtonText}>কাস্টমার যোগ করুন</Text>
+            </TouchableOpacity>
           </View>
         }
       />
       
-      {/* Add Customer Modal */}
+      {/* Customer Add/Edit Modal */}
       <Modal
         visible={viewModel.modalVisible}
-        animationType="slide"
         transparent={true}
+        animationType="slide"
+        onRequestClose={() => viewModel.setModalVisible(false)}
       >
-        <View style={styles.modalContainer}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>নতুন কাস্টমার যোগ করুন</Text>
+            <Text style={styles.modalTitle}>
+              {viewModel.selectedCustomer ? 'কাস্টমার সম্পাদনা' : 'নতুন কাস্টমার'}
+            </Text>
             
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>নাম</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="কাস্টমারের নাম"
-                value={viewModel.newCustomer.name}
-                onChangeText={(text) => viewModel.setNewCustomer({
-                  ...viewModel.newCustomer,
-                  name: text
-                })}
-              />
-            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="কাস্টমারের নাম"
+              value={viewModel.selectedCustomer ? viewModel.selectedCustomer.name : viewModel.newCustomer.name}
+              onChangeText={(text) => {
+                if (viewModel.selectedCustomer) {
+                  viewModel.setSelectedCustomer({
+                    ...viewModel.selectedCustomer,
+                    name: text
+                  });
+                } else {
+                  viewModel.setNewCustomer({
+                    ...viewModel.newCustomer,
+                    name: text
+                  });
+                }
+              }}
+            />
             
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>ফোন নম্বর</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="ফোন নম্বর"
-                keyboardType="phone-pad"
-                value={viewModel.newCustomer.phone}
-                onChangeText={(text) => viewModel.setNewCustomer({
-                  ...viewModel.newCustomer,
-                  phone: text
-                })}
-              />
-            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="ফোন নম্বর"
+              keyboardType="phone-pad"
+              value={viewModel.selectedCustomer ? viewModel.selectedCustomer.phone : viewModel.newCustomer.phone}
+              onChangeText={(text) => {
+                if (viewModel.selectedCustomer) {
+                  viewModel.setSelectedCustomer({
+                    ...viewModel.selectedCustomer,
+                    phone: text
+                  });
+                } else {
+                  viewModel.setNewCustomer({
+                    ...viewModel.newCustomer,
+                    phone: text
+                  });
+                }
+              }}
+            />
             
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>ঠিকানা</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="ঠিকানা"
-                value={viewModel.newCustomer.address}
-                onChangeText={(text) => viewModel.setNewCustomer({
-                  ...viewModel.newCustomer,
-                  address: text
-                })}
-              />
-            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="ঠিকানা"
+              value={viewModel.selectedCustomer ? viewModel.selectedCustomer.address : viewModel.newCustomer.address}
+              onChangeText={(text) => {
+                if (viewModel.selectedCustomer) {
+                  viewModel.setSelectedCustomer({
+                    ...viewModel.selectedCustomer,
+                    address: text
+                  });
+                } else {
+                  viewModel.setNewCustomer({
+                    ...viewModel.newCustomer,
+                    address: text
+                  });
+                }
+              }}
+            />
             
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>ক্রেডিট লিমিট</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="ক্রেডিট লিমিট (টাকা)"
-                keyboardType="numeric"
-                value={viewModel.newCustomer.creditLimit}
-                onChangeText={(text) => viewModel.setNewCustomer({
-                  ...viewModel.newCustomer,
-                  creditLimit: text
-                })}
-              />
-            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="ক্রেডিট লিমিট"
+              keyboardType="numeric"
+              value={viewModel.selectedCustomer 
+                ? viewModel.selectedCustomer.creditLimit?.toString() 
+                : viewModel.newCustomer.creditLimit
+              }
+              onChangeText={(text) => {
+                if (viewModel.selectedCustomer) {
+                  viewModel.setSelectedCustomer({
+                    ...viewModel.selectedCustomer,
+                    creditLimit: parseFloat(text) || 0
+                  });
+                } else {
+                  viewModel.setNewCustomer({
+                    ...viewModel.newCustomer,
+                    creditLimit: text
+                  });
+                }
+              }}
+            />
             
-            <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={styles.cancelButton}
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => viewModel.setModalVisible(false)}
               >
-                <Text style={styles.cancelButtonText}>বাতিল</Text>
+                <Text style={styles.buttonText}>বাতিল</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity 
-                style={styles.saveButton}
-                onPress={viewModel.handleAddCustomer}
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={viewModel.selectedCustomer 
+                  ? viewModel.handleUpdateCustomer 
+                  : viewModel.handleAddCustomer
+                }
               >
-                <Text style={styles.saveButtonText}>সেভ করুন</Text>
+                <Text style={styles.buttonText}>সংরক্ষণ</Text>
               </TouchableOpacity>
             </View>
           </View>
-        </View>
-      </Modal>
-      
-      {/* Customer Details Modal */}
-      <Modal
-        visible={!!viewModel.selectedCustomer}
-        animationType="slide"
-        transparent={true}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>কাস্টমার বিস্তারিত</Text>
-              <TouchableOpacity onPress={() => viewModel.setSelectedCustomer(null)}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-            
-            {viewModel.selectedCustomer && (
-              <>
-                <View style={styles.customerDetailHeader}>
-                  <Text style={styles.customerDetailName}>{viewModel.selectedCustomer.name}</Text>
-                  <View style={[
-                    styles.creditBadge,
-                    viewModel.selectedCustomer.outstandingCredit > 0 
-                      ? styles.creditBadgeWarning 
-                      : styles.creditBadgeGood
-                  ]}>
-                    <Text style={styles.creditBadgeText}>
-                      {viewModel.selectedCustomer.outstandingCredit > 0 ? 'বাকি আছে' : 'কোন বাকি নেই'}
-                    </Text>
-                  </View>
-                </View>
-                
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>ফোন নম্বর</Text>
-                  <Text style={styles.detailValue}>{viewModel.selectedCustomer.phone}</Text>
-                </View>
-                
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>ঠিকানা</Text>
-                  <Text style={styles.detailValue}>
-                    {viewModel.selectedCustomer.address || 'কোন ঠিকানা নেই'}
-                  </Text>
-                </View>
-                
-                <View style={styles.detailStats}>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statValue}>
-                      {viewModel.selectedCustomer.totalPurchases}
-                    </Text>
-                    <Text style={styles.statLabel}>মোট লেনদেন</Text>
-                  </View>
-                  
-                  <View style={styles.statItem}>
-                    <Text style={styles.statValue}>
-                      {formatCurrency(viewModel.selectedCustomer.creditLimit)}
-                    </Text>
-                    <Text style={styles.statLabel}>ক্রেডিট লিমিট</Text>
-                  </View>
-                  
-                  <View style={styles.statItem}>
-                    <Text style={[
-                      styles.statValue, 
-                      viewModel.selectedCustomer.outstandingCredit > 0 && styles.outstandingCredit
-                    ]}>
-                      {formatCurrency(viewModel.selectedCustomer.outstandingCredit)}
-                    </Text>
-                    <Text style={styles.statLabel}>বাকির পরিমাণ</Text>
-                  </View>
-                </View>
-                
-                <Text style={styles.historyTitle}>লেনদেনের ইতিহাস</Text>
-                
-                <FlatList
-                  data={viewModel.selectedCustomer.history}
-                  keyExtractor={(item) => item.id}
-                  renderItem={renderCreditHistoryItem}
-                  style={styles.historyList}
-                  ListEmptyComponent={
-                    <Text style={styles.emptyHistory}>কোন লেনদেনের ইতিহাস নেই</Text>
-                  }
-                />
-              </>
-            )}
-          </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
       
       {/* Payment Modal */}
       <Modal
         visible={viewModel.paymentModalVisible}
-        animationType="slide"
         transparent={true}
+        animationType="slide"
+        onRequestClose={() => viewModel.setPaymentModalVisible(false)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent} style={[styles.modalContent, styles.paymentModal]}>
-            <Text style={styles.modalTitle}>পেমেন্ট রেকর্ড করুন</Text>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>পেমেন্ট রেকর্ড</Text>
             
             {viewModel.selectedCustomer && (
-              <>
-                <View style={styles.paymentInfo}>
-                  <Text style={styles.paymentCustomer}>{viewModel.selectedCustomer.name}</Text>
-                  <Text style={styles.paymentBalance}>
-                    বর্তমান বাকি: {formatCurrency(viewModel.selectedCustomer.outstandingCredit)}
-                  </Text>
-                </View>
-                
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>পেমেন্টের পরিমাণ</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="পেমেন্টের পরিমাণ"
-                    keyboardType="numeric"
-                    value={viewModel.paymentAmount}
-                    onChangeText={viewModel.setPaymentAmount}
-                  />
-                </View>
-                
-                <View style={styles.modalButtons}>
-                  <TouchableOpacity 
-                    style={styles.cancelButton}
-                    onPress={() => viewModel.setPaymentModalVisible(false)}
-                  >
-                    <Text style={styles.cancelButtonText}>বাতিল</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={styles.saveButton}
-                    onPress={viewModel.handleRecordPayment}
-                  >
-                    <Text style={styles.saveButtonText}>রেকর্ড করুন</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
+              <View style={styles.paymentCustomerInfo}>
+                <Text style={styles.paymentCustomerName}>{viewModel.selectedCustomer.name}</Text>
+                <Text style={styles.paymentCustomerBalance}>
+                  বর্তমান বাকি: ৳{(viewModel.selectedCustomer.outstandingBalance || 0).toLocaleString()}
+                </Text>
+              </View>
             )}
+            
+            <TextInput
+              style={styles.input}
+              placeholder="পেমেন্ট পরিমাণ"
+              keyboardType="numeric"
+              value={viewModel.paymentAmount}
+              onChangeText={viewModel.setPaymentAmount}
+            />
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => viewModel.setPaymentModalVisible(false)}
+              >
+                <Text style={styles.buttonText}>বাতিল</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={viewModel.handleRecordPayment}
+              >
+                <Text style={styles.buttonText}>রেকর্ড করুন</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  backButton: {
-    marginRight: 16,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    flex: 1,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    paddingVertical: 10,
   },
-  searchIcon: {
-    marginRight: 8,
+  addButton: {
+    backgroundColor: '#2c3e50',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
   },
-  searchInput: {
-    flex: 1,
-    height: 40,
+  debtorsContainer: {
+    marginBottom: 10,
+  },
+  sectionTitle: {
     fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginHorizontal: 16,
+    marginBottom: 8,
   },
-  list: {
+  debtorsList: {
+    paddingHorizontal: 12,
+  },
+  debtorCard: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    marginHorizontal: 4,
+    width: 140,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+  },
+  debtorName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#2c3e50',
+    marginBottom: 4,
+  },
+  debtorAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#e74c3c',
+  },
+  customersList: {
     padding: 16,
+    paddingTop: 8,
   },
   customerCard: {
     backgroundColor: '#fff',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 16,
+    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2,
   },
   customerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   customerName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#2c3e50',
+    flex: 1,
   },
-  creditBadge: {
-    paddingHorizontal: 8,
+  balanceBadge: {
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 12,
   },
-  creditBadgeGood: {
-    backgroundColor: '#e6f4ea',
+  debtBadge: {
+    backgroundColor: '#fef2f2',
   },
-  creditBadgeWarning: {
-    backgroundColor: '#fef7e6',
+  noBadge: {
+    backgroundColor: '#f0fff4',
   },
-  creditBadgeText: {
-    fontSize: 12,
+  balanceText: {
+    fontSize: 14,
     fontWeight: '500',
-    color: '#43a047',
+    color: '#e74c3c',
   },
-  customerInfo: {
+  customerDetails: {
+    marginBottom: 16,
+  },
+  detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 6,
   },
-  customerPhone: {
+  detailText: {
     fontSize: 14,
     color: '#555',
     marginLeft: 8,
   },
-  customerAddress: {
-    fontSize: 14,
-    color: '#555',
-    marginLeft: 8,
-  },
-  creditContainer: {
+  actionRow: {
     flexDirection: 'row',
-    marginTop: 12,
-    marginBottom: 16,
+    justifyContent: 'space-between',
   },
-  creditItem: {
-    flex: 1,
-  },
-  creditLabel: {
-    fontSize: 12,
-    color: '#777',
-    marginBottom: 4,
-  },
-  creditValue: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-  },
-  outstandingCredit: {
-    color: '#f57c00',
-  },
-  buttonContainer: {
+  actionButton: {
     flexDirection: 'row',
-  },
-  detailsButton: {
-    flex: 1,
-    backgroundColor: '#1565C0',
-    paddingVertical: 8,
-    borderRadius: 4,
     alignItems: 'center',
-    marginRight: 8,
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    flex: 1,
+    marginHorizontal: 4,
   },
-  detailsButtonText: {
-    color: '#fff',
-    fontWeight: '500',
+  editButton: {
+    backgroundColor: '#3498db',
   },
   paymentButton: {
-    flex: 1,
-    backgroundColor: '#43a047',
-    paddingVertical: 8,
-    borderRadius: 4,
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  paymentButtonText: {
-    color: '#fff',
-    fontWeight: '500',
+    backgroundColor: '#2ecc71',
   },
   deleteButton: {
-    backgroundColor: '#e53935',
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 4,
+    backgroundColor: '#e74c3c',
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '500',
+    marginLeft: 4,
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
+    padding: 40,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#666',
-    marginTop: 16,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
+    fontSize: 16,
+    color: '#7f8c8d',
+    marginTop: 12,
+    marginBottom: 16,
     textAlign: 'center',
-    marginTop: 8,
+  },
+  emptyButton: {
+    backgroundColor: '#3498db',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 6,
+  },
+  emptyButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
   },
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 16,
   },
   modalContent: {
     backgroundColor: '#fff',
-    marginHorizontal: 16,
-    borderRadius: 8,
-    padding: 24,
-    maxHeight: '90%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
+    borderRadius: 12,
+    padding: 20,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#2c3e50',
     marginBottom: 16,
-  },
-  inputContainer: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
+    textAlign: 'center',
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 4,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 8,
-  },
-  cancelButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  cancelButtonText: {
-    color: '#777',
-    fontWeight: '500',
-  },
-  saveButton: {
-    backgroundColor: '#1565C0',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 4,
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontWeight: '500',
-  },
-  customerDetailHeader: {
-    marginBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  customerDetailName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginRight: 8,
-  },
-  detailItem: {
-    marginBottom: 12,
-  },
-  detailLabel: {
-    fontSize: 12,
-    color: '#777',
-    marginBottom: 4,
-  },
-  detailValue: {
-    fontSize: 16,
-    color: '#333',
-  },
-  detailStats: {
-    flexDirection: 'row',
-    marginVertical: 16,
-    padding: 16,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#f5f5f5',
     borderRadius: 8,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#777',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  historyTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 8,
-    marginBottom: 12,
-    color: '#333',
-  },
-  historyList: {
-    maxHeight: 300,
-  },
-  historyItem: {
     padding: 12,
-    borderRadius: 6,
-    marginBottom: 8,
+    fontSize: 16,
+    marginBottom: 12,
   },
-  purchaseItem: {
-    backgroundColor: '#fff3e0',
-  },
-  paymentItem: {
-    backgroundColor: '#e8f5e9',
-  },
-  historyHeader: {
+  modalActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    marginTop: 8,
   },
-  historyType: {
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: 6,
+  },
+  cancelButton: {
+    backgroundColor: '#95a5a6',
+  },
+  saveButton: {
+    backgroundColor: '#2ecc71',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '500',
   },
-  historyDate: {
-    fontSize: 12,
-    color: '#777',
-  },
-  historyAmount: {
-    marginBottom: 8,
-  },
-  amountValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  purchaseAmount: {
-    color: '#f57c00',
-  },
-  paymentAmount: {
-    color: '#43a047',
-  },
-  dueDate: {
-    fontSize: 12,
-    color: '#777',
-    marginTop: 4,
-  },
-  historyNotes: {
-    fontSize: 12,
-    color: '#555',
-    fontStyle: 'italic',
-  },
-  emptyHistory: {
-    fontSize: 14,
-    color: '#999',
-    fontStyle: 'italic',
-    textAlign: 'center',
-    paddingVertical: 16,
-  },
-  paymentModal: {
-    padding: 24,
-  },
-  paymentInfo: {
+  paymentCustomerInfo: {
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
     marginBottom: 16,
   },
-  paymentCustomer: {
-    fontSize: 18,
+  paymentCustomerName: {
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#2c3e50',
     marginBottom: 4,
   },
-  paymentBalance: {
-    fontSize: 16,
-    color: '#777',
+  paymentCustomerBalance: {
+    fontSize: 14,
+    color: '#e74c3c',
   },
 });
-
-export default CustomerManagementScreen;

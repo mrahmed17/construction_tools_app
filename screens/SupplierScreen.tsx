@@ -52,120 +52,138 @@ const useSupplierViewModel = () => {
   const loadSuppliers = async () => {
     try {
       setLoading(true);
-      const suppliersJson = await AsyncStorage.getItem('suppliers');
-      
-      if (suppliersJson) {
-        const loadedSuppliers: SupplierType[] = JSON.parse(suppliersJson);
-        setSuppliers(loadedSuppliers);
-      } else {
-        setSuppliers([]);
+      const storedSuppliers = await AsyncStorage.getItem('suppliers');
+      if (storedSuppliers) {
+        const parsedSuppliers = JSON.parse(storedSuppliers);
+        setSuppliers(parsedSuppliers);
+        setFilteredSuppliers(parsedSuppliers);
       }
     } catch (error) {
       console.error('Error loading suppliers:', error);
-      Alert.alert('Error', 'Failed to load supplier data');
+      Alert.alert('ত্রুটি', 'সাপ্লাইয়ার তথ্য লোড করতে সমস্যা হয়েছে।');
     } finally {
       setLoading(false);
     }
   };
   
+  // Save suppliers to storage
+  const saveSuppliers = async (updatedSuppliers: SupplierType[]) => {
+    try {
+      await AsyncStorage.setItem('suppliers', JSON.stringify(updatedSuppliers));
+    } catch (error) {
+      console.error('Error saving suppliers:', error);
+      Alert.alert('ত্রুটি', 'সাপ্লাইয়ার তথ্য সংরক্ষণ করতে সমস্যা হয়েছে।');
+    }
+  };
+  
   // Filter suppliers based on search text
-  const filterSuppliers = useCallback(() => {
-    if (!searchText) {
+  const filterSuppliers = () => {
+    if (!searchText.trim()) {
       setFilteredSuppliers(suppliers);
       return;
     }
     
-    const lowerCaseSearch = searchText.toLowerCase();
-    const filtered = suppliers.filter(s => 
-      (s.name && s.name.toLowerCase().includes(lowerCaseSearch)) ||
-      (s.phone && s.phone.includes(searchText)) ||
-      (s.company && s.company.toLowerCase().includes(lowerCaseSearch)) ||
-      (s.address && s.address.toLowerCase().includes(lowerCaseSearch))
+    const filtered = suppliers.filter(supplier => 
+      supplier.name.toLowerCase().includes(searchText.toLowerCase()) ||
+      supplier.phone.includes(searchText) ||
+      supplier.company.toLowerCase().includes(searchText.toLowerCase())
     );
     
     setFilteredSuppliers(filtered);
-  }, [searchText, suppliers]);
+  };
   
-  // Save supplier to storage
-  const saveSupplier = async (supplier: SupplierType) => {
-    try {
-      let updatedSuppliers;
-      
-      if (editingSupplier) {
-        // Update existing supplier
-        updatedSuppliers = suppliers.map(s => 
-          s.id === supplier.id ? supplier : s
-        );
-      } else {
-        // Add new supplier
-        updatedSuppliers = [...suppliers, supplier];
-      }
-      
-      setSuppliers(updatedSuppliers);
-      await AsyncStorage.setItem('suppliers', JSON.stringify(updatedSuppliers));
-      
-      Alert.alert('Success', editingSupplier 
-        ? 'সাপ্লাইয়ার আপডেট হয়েছে'
-        : 'নতুন সাপ্লাইয়ার যোগ হয়েছে'
-      );
-      
-      // Reset form and close modal
-      resetFormAndCloseModal();
-      
-    } catch (error) {
-      console.error('Error saving supplier:', error);
-      Alert.alert('Error', 'সাপ্লাইয়ার সেভ করতে ত্রুটি হয়েছে');
+  // Add new supplier
+  const addSupplier = () => {
+    if (!supplierName.trim() || !supplierPhone.trim() || !supplierCompany.trim()) {
+      Alert.alert('ত্রুটি', 'সাপ্লাইয়ারের নাম, ফোন নম্বর এবং কোম্পানি প্রয়োজন।');
+      return;
     }
+    
+    const newSupplier: SupplierType = {
+      id: Date.now().toString(),
+      name: supplierName,
+      phone: supplierPhone,
+      address: supplierAddress,
+      email: supplierEmail,
+      notes: supplierNotes,
+      company: supplierCompany,
+      balance: parseFloat(supplierBalance) || 0,
+      createdAt: new Date().toISOString()
+    };
+    
+    const updatedSuppliers = [...suppliers, newSupplier];
+    setSuppliers(updatedSuppliers);
+    saveSuppliers(updatedSuppliers);
+    resetForm();
+    setIsModalVisible(false);
+  };
+  
+  // Update existing supplier
+  const updateSupplier = () => {
+    if (!editingSupplier) return;
+    
+    if (!supplierName.trim() || !supplierPhone.trim() || !supplierCompany.trim()) {
+      Alert.alert('ত্রুটি', 'সাপ্লাইয়ারের নাম, ফোন নম্বর এবং কোম্পানি প্রয়োজন।');
+      return;
+    }
+    
+    const updatedSupplier: SupplierType = {
+      ...editingSupplier,
+      name: supplierName,
+      phone: supplierPhone,
+      address: supplierAddress,
+      email: supplierEmail,
+      notes: supplierNotes,
+      company: supplierCompany,
+      balance: parseFloat(supplierBalance) || 0
+    };
+    
+    const updatedSuppliers = suppliers.map(supplier => 
+      supplier.id === editingSupplier.id ? updatedSupplier : supplier
+    );
+    
+    setSuppliers(updatedSuppliers);
+    saveSuppliers(updatedSuppliers);
+    resetForm();
+    setIsModalVisible(false);
   };
   
   // Delete supplier
-  const deleteSupplier = async (id: string) => {
+  const deleteSupplier = (id: string) => {
     Alert.alert(
-      'নিশ্চিত করুন',
-      'আপনি কি এই সাপ্লাইয়ার মুছে ফেলতে চান?',
+      'নিশ্চিতকরণ',
+      'আপনি কি এই সাপ্লাইয়ারকে মুছে ফেলতে চান?',
       [
         { text: 'বাতিল', style: 'cancel' },
-        {
-          text: 'মুছে ফেলুন',
+        { 
+          text: 'মুছুন', 
           style: 'destructive',
-          onPress: async () => {
-            try {
-              const updatedSuppliers = suppliers.filter(s => s.id !== id);
-              setSuppliers(updatedSuppliers);
-              await AsyncStorage.setItem('suppliers', JSON.stringify(updatedSuppliers));
-              Alert.alert('Success', 'সাপ্লাইয়ার মুছে ফেলা হয়েছে');
-            } catch (error) {
-              console.error('Error deleting supplier:', error);
-              Alert.alert('Error', 'সাপ্লাইয়ার মুছতে ত্রুটি হয়েছে');
-            }
+          onPress: () => {
+            const updatedSuppliers = suppliers.filter(supplier => supplier.id !== id);
+            setSuppliers(updatedSuppliers);
+            saveSuppliers(updatedSuppliers);
           }
         }
       ]
     );
   };
   
-  // Open modal for adding new supplier
-  const openAddSupplierModal = useCallback(() => {
-    setEditingSupplier(null);
-    resetForm();
-    setIsModalVisible(true);
-  }, []);
-  
-  // Open modal for editing existing supplier
-  const openEditSupplierModal = useCallback((supplier: SupplierType) => {
+  // Edit supplier
+  const editSupplier = (supplier: SupplierType) => {
     setEditingSupplier(supplier);
     setSupplierName(supplier.name);
     setSupplierPhone(supplier.phone);
-    setSupplierAddress(supplier.address);
+    setSupplierAddress(supplier.address || '');
     setSupplierEmail(supplier.email || '');
     setSupplierNotes(supplier.notes || '');
-    setSupplierCompany(supplier.company || '');
-    setSupplierBalance(supplier.balance ? supplier.balance.toString() : '0');
+    setSupplierCompany(supplier.company);
+    setSupplierBalance(supplier.balance.toString());
     setIsModalVisible(true);
-  }, []);
+  };
   
   // Reset form fields
-  const resetForm = useCallback(() => {
+  const resetForm = () => {
+    setEditingSupplier(null);
     setSupplierName('');
     setSupplierPhone('');
     setSupplierAddress('');
@@ -173,73 +191,16 @@ const useSupplierViewModel = () => {
     setSupplierNotes('');
     setSupplierCompany('');
     setSupplierBalance('0');
-  }, []);
+  };
   
-  // Reset form and close modal
-  const resetFormAndCloseModal = useCallback(() => {
-    resetForm();
-    setIsModalVisible(false);
-    setEditingSupplier(null);
-  }, [resetForm]);
-  
-  // Handle submit for add/edit supplier
-  const handleSubmit = useCallback(() => {
-    if (!validateForm()) return;
-    
-    const supplier: SupplierType = {
-      id: editingSupplier ? editingSupplier.id : Date.now().toString(),
-      name: supplierName,
-      phone: supplierPhone,
-      address: supplierAddress,
-      email: supplierEmail || undefined,
-      notes: supplierNotes || undefined,
-      company: supplierCompany || undefined,
-      balance: parseFloat(supplierBalance) || 0,
-      unpaidAmount: editingSupplier ? editingSupplier.unpaidAmount : 0,
-      lastPurchaseDate: editingSupplier ? editingSupplier.lastPurchaseDate : undefined,
-      lastPurchase: editingSupplier ? editingSupplier.lastPurchase : undefined
-    };
-    
-    saveSupplier(supplier);
-  }, [
-    supplierName, 
-    supplierPhone, 
-    supplierAddress, 
-    supplierEmail, 
-    supplierNotes, 
-    supplierCompany, 
-    supplierBalance, 
-    editingSupplier, 
-    validateForm, 
-    saveSupplier
-  ]);
-  
-  // Validate form before saving
-  const validateForm = useCallback(() => {
-    if (!supplierName.trim()) {
-      Alert.alert('Error', 'সাপ্লাইয়ারের নাম প্রবেশ করুন');
-      return false;
-    }
-    
-    if (!supplierPhone.trim()) {
-      Alert.alert('Error', 'সাপ্লাইয়ারের ফোন নম্বর প্রবেশ করুন');
-      return false;
-    }
-    
-    if (!supplierAddress.trim()) {
-      Alert.alert('Error', 'সাপ্লাইয়ারের ঠিকানা প্রবেশ করুন');
-      return false;
-    }
-    
-    return true;
-  }, [supplierName, supplierPhone, supplierAddress]);
-
   return {
-    suppliers: filteredSuppliers,
+    suppliers,
+    filteredSuppliers,
     loading,
     searchText,
     setSearchText,
     isModalVisible,
+    setIsModalVisible,
     editingSupplier,
     supplierName,
     setSupplierName,
@@ -255,254 +216,226 @@ const useSupplierViewModel = () => {
     setSupplierCompany,
     supplierBalance,
     setSupplierBalance,
-    openAddSupplierModal,
-    openEditSupplierModal,
-    resetFormAndCloseModal,
-    handleSubmit,
-    deleteSupplier
+    loadSuppliers,
+    addSupplier,
+    updateSupplier,
+    deleteSupplier,
+    editSupplier,
+    resetForm
   };
 };
 
-// MVVM architecture: View component that uses the ViewModel
+// Supplier Screen Component
 export default function SupplierScreen() {
   const navigation = useNavigation();
   const viewModel = useSupplierViewModel();
   
-  // Render each supplier item in the list
-  const renderSupplierItem = ({ item }: { item: SupplierType }) => {
-    return (
-      <View style={styles.supplierItem}>
-        <TouchableOpacity
-          style={styles.supplierInfo}
-          onPress={() => viewModel.openEditSupplierModal(item)}
-        >
-          <Text style={styles.supplierName}>{item.name}</Text>
-          {item.company && (
-            <Text style={styles.supplierCompany}>
-              <Ionicons name="business-outline" size={14} color="#4A6572" /> {item.company}
-            </Text>
-          )}
-          <Text style={styles.supplierDetail}>
-            <Ionicons name="call-outline" size={14} color="#4A6572" /> {item.phone}
-          </Text>
-          <Text style={styles.supplierDetail}>
-            <Ionicons name="location-outline" size={14} color="#4A6572" /> {item.address}
-          </Text>
-          {item.email && (
-            <Text style={styles.supplierDetail}>
-              <Ionicons name="mail-outline" size={14} color="#4A6572" /> {item.email}
-            </Text>
-          )}
-          {item.unpaidAmount > 0 && (
-            <Text style={styles.unpaidAmount}>
-              বাকি: ৳{item.unpaidAmount.toFixed(2)}
-            </Text>
-          )}
-          {item.balance > 0 && (
-            <Text style={styles.balanceAmount}>
-              ব্যালেন্স: ৳{item.balance.toFixed(2)}
-            </Text>
-          )}
-        </TouchableOpacity>
+  // Render supplier item
+  const renderSupplierItem = ({ item }: { item: SupplierType }) => (
+    <View style={styles.supplierCard}>
+      <View style={styles.supplierHeader}>
+        <Text style={styles.supplierName}>{item.name}</Text>
+        <Text style={styles.supplierCompany}>{item.company}</Text>
+      </View>
+      
+      <View style={styles.supplierDetails}>
+        <View style={styles.detailRow}>
+          <Ionicons name="call-outline" size={16} color="#555" />
+          <Text style={styles.detailText}>{item.phone}</Text>
+        </View>
         
-        <View style={styles.supplierActions}>
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => viewModel.openEditSupplierModal(item)}
-          >
-            <Ionicons name="create-outline" size={20} color="#4A6572" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => viewModel.deleteSupplier(item.id)}
-          >
-            <Ionicons name="trash-outline" size={20} color="#E57373" />
-          </TouchableOpacity>
+        {item.address && (
+          <View style={styles.detailRow}>
+            <Ionicons name="location-outline" size={16} color="#555" />
+            <Text style={styles.detailText}>{item.address}</Text>
+          </View>
+        )}
+        
+        {item.email && (
+          <View style={styles.detailRow}>
+            <Ionicons name="mail-outline" size={16} color="#555" />
+            <Text style={styles.detailText}>{item.email}</Text>
+          </View>
+        )}
+        
+        <View style={styles.detailRow}>
+          <Ionicons name="wallet-outline" size={16} color="#555" />
+          <Text style={styles.detailText}>
+            বাকি: ৳{item.balance.toLocaleString()}
+          </Text>
         </View>
       </View>
+      
+      {item.notes && (
+        <View style={styles.notesContainer}>
+          <Text style={styles.notesLabel}>নোট:</Text>
+          <Text style={styles.notesText}>{item.notes}</Text>
+        </View>
+      )}
+      
+      <View style={styles.actionRow}>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.editButton]}
+          onPress={() => viewModel.editSupplier(item)}
+        >
+          <Ionicons name="create-outline" size={16} color="#fff" />
+          <Text style={styles.actionButtonText}>সম্পাদনা</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.deleteButton]}
+          onPress={() => viewModel.deleteSupplier(item.id)}
+        >
+          <Ionicons name="trash-outline" size={16} color="#fff" />
+          <Text style={styles.actionButtonText}>মুছুন</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+  
+  if (viewModel.loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#2c3e50" />
+        <Text style={styles.loadingText}>সাপ্লাইয়ার তথ্য লোড হচ্ছে...</Text>
+      </View>
     );
-  };
+  }
   
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      {/* Header */}
-      <Header 
-        title="সাপ্লাইয়ার ব্যবস্থাপনা" 
-        showBackButton={true} 
-        showMenuButton={false} 
-        backgroundColor="#1565C0"
-        textColor="#fff"
-        rightComponent={
-          <TouchableOpacity 
-            style={styles.headerButton}
-            onPress={viewModel.openAddSupplierModal}
-          >
-            <Ionicons name="add-circle-outline" size={24} color="#fff" />
-          </TouchableOpacity>
+    <SafeAreaView style={styles.container}>
+      <Header title="সাপ্লাইয়ার ব্যবস্থাপনা" />
+      
+      <View style={styles.searchContainer}>
+        <SearchBar
+          placeholder="সাপ্লাইয়ার খুঁজুন..."
+          value={viewModel.searchText}
+          onChangeText={viewModel.setSearchText}
+        />
+        
+        <TouchableOpacity 
+          style={styles.addButton}
+          onPress={() => {
+            viewModel.resetForm();
+            viewModel.setIsModalVisible(true);
+          }}
+        >
+          <Ionicons name="add" size={24} color="#fff" />
+        </TouchableOpacity>
+      </View>
+      
+      <FlatList
+        data={viewModel.filteredSuppliers}
+        renderItem={renderSupplierItem}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.suppliersList}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="people-outline" size={48} color="#ccc" />
+            <Text style={styles.emptyText}>
+              {viewModel.searchText ? 'কোন সাপ্লাইয়ার পাওয়া যায়নি' : 'কোন সাপ্লাইয়ার নেই'}
+            </Text>
+            <TouchableOpacity 
+              style={styles.emptyButton}
+              onPress={() => {
+                viewModel.resetForm();
+                viewModel.setIsModalVisible(true);
+              }}
+            >
+              <Text style={styles.emptyButtonText}>সাপ্লাইয়ার যোগ করুন</Text>
+            </TouchableOpacity>
+          </View>
         }
       />
       
-      {/* Search bar */}
-      <View style={styles.searchContainer}>
-        <SearchBar
-          value={viewModel.searchText}
-          onChangeText={viewModel.setSearchText}
-          placeholder="সাপ্লাইয়ার অনুসন্ধান করুন..."
-          backgroundColor="#f5f5f5"
-          borderColor="#e0e0e0"
-        />
-      </View>
-      
-      {/* Supplier list */}
-      {viewModel.loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#1565C0" />
-          <Text style={styles.loadingText}>সাপ্লাইয়ার লোড হচ্ছে...</Text>
-        </View>
-      ) : viewModel.suppliers.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="people-outline" size={60} color="#ccc" />
-          <Text style={styles.emptyText}>
-            {viewModel.searchText ? 'কোন সাপ্লাইয়ার পাওয়া যায়নি' : 'কোন সাপ্লাইয়ার নেই'}
-          </Text>
-          <TouchableOpacity 
-            style={styles.addSupplierButton}
-            onPress={viewModel.openAddSupplierModal}
-          >
-            <Text style={styles.addSupplierButtonText}>নতুন সাপ্লাইয়ার যোগ করুন</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <FlatList
-          data={viewModel.suppliers}
-          renderItem={renderSupplierItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.supplierList}
-        />
-      )}
-      
-      {/* Floating Action Button */}
-      <TouchableOpacity 
-        style={styles.fabButton}
-        onPress={viewModel.openAddSupplierModal}
-      >
-        <Ionicons name="add" size={24} color="#fff" />
-      </TouchableOpacity>
-      
-      {/* Add/Edit Modal */}
+      {/* Supplier Add/Edit Modal */}
       <Modal
         visible={viewModel.isModalVisible}
-        animationType="slide"
         transparent={true}
-        onRequestClose={viewModel.resetFormAndCloseModal}
+        animationType="slide"
+        onRequestClose={() => viewModel.setIsModalVisible(false)}
       >
-        <KeyboardAvoidingView
+        <KeyboardAvoidingView 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalContainer}
         >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
+          <ScrollView contentContainerStyle={styles.modalScrollContainer}>
+            <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>
-                {viewModel.editingSupplier ? 'সাপ্লাইয়ার আপডেট করুন' : 'নতুন সাপ্লাইয়ার যোগ করুন'}
+                {viewModel.editingSupplier ? 'সাপ্লাইয়ার সম্পাদনা' : 'নতুন সাপ্লাইয়ার'}
               </Text>
-              <TouchableOpacity onPress={viewModel.resetFormAndCloseModal}>
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
+              
+              <TextInput
+                style={styles.input}
+                placeholder="সাপ্লাইয়ারের নাম"
+                value={viewModel.supplierName}
+                onChangeText={viewModel.setSupplierName}
+              />
+              
+              <TextInput
+                style={styles.input}
+                placeholder="কোম্পানি"
+                value={viewModel.supplierCompany}
+                onChangeText={viewModel.setSupplierCompany}
+              />
+              
+              <TextInput
+                style={styles.input}
+                placeholder="ফোন নম্বর"
+                keyboardType="phone-pad"
+                value={viewModel.supplierPhone}
+                onChangeText={viewModel.setSupplierPhone}
+              />
+              
+              <TextInput
+                style={styles.input}
+                placeholder="ঠিকানা"
+                value={viewModel.supplierAddress}
+                onChangeText={viewModel.setSupplierAddress}
+              />
+              
+              <TextInput
+                style={styles.input}
+                placeholder="ইমেইল"
+                keyboardType="email-address"
+                value={viewModel.supplierEmail}
+                onChangeText={viewModel.setSupplierEmail}
+              />
+              
+              <TextInput
+                style={styles.input}
+                placeholder="বাকি পরিমাণ"
+                keyboardType="numeric"
+                value={viewModel.supplierBalance}
+                onChangeText={viewModel.setSupplierBalance}
+              />
+              
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="নোট"
+                multiline={true}
+                numberOfLines={4}
+                value={viewModel.supplierNotes}
+                onChangeText={viewModel.setSupplierNotes}
+              />
+              
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => viewModel.setIsModalVisible(false)}
+                >
+                  <Text style={styles.buttonText}>বাতিল</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.saveButton]}
+                  onPress={viewModel.editingSupplier ? viewModel.updateSupplier : viewModel.addSupplier}
+                >
+                  <Text style={styles.buttonText}>সংরক্ষণ</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-            
-            <ScrollView style={styles.modalScrollView}>
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>নাম *</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={viewModel.supplierName}
-                  onChangeText={viewModel.setSupplierName}
-                  placeholder="সাপ্লাইয়ারের নাম"
-                />
-              </View>
-              
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>কোম্পানি (ঐচ্ছিক)</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={viewModel.supplierCompany}
-                  onChangeText={viewModel.setSupplierCompany}
-                  placeholder="সাপ্লাইয়ারের কোম্পানি"
-                />
-              </View>
-              
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>ফোন নম্বর *</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={viewModel.supplierPhone}
-                  onChangeText={viewModel.setSupplierPhone}
-                  placeholder="সাপ্লাইয়ারের ফোন নম্বর"
-                  keyboardType="phone-pad"
-                />
-              </View>
-              
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>ঠিকানা *</Text>
-                <TextInput
-                  style={[styles.formInput, styles.multilineInput]}
-                  value={viewModel.supplierAddress}
-                  onChangeText={viewModel.setSupplierAddress}
-                  placeholder="সাপ্লাইয়ারের ঠিকানা"
-                  multiline
-                />
-              </View>
-              
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>ইমেইল (ঐচ্ছিক)</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={viewModel.supplierEmail}
-                  onChangeText={viewModel.setSupplierEmail}
-                  placeholder="সাপ্লাইয়ারের ইমেইল"
-                  keyboardType="email-address"
-                />
-              </View>
-              
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>ব্যালেন্স (ঐচ্ছিক)</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={viewModel.supplierBalance}
-                  onChangeText={viewModel.setSupplierBalance}
-                  placeholder="সাপ্লাইয়ারের ব্যালেন্স"
-                  keyboardType="numeric"
-                />
-              </View>
-              
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>নোট (ঐচ্ছিক)</Text>
-                <TextInput
-                  style={[styles.formInput, styles.multilineInput]}
-                  value={viewModel.supplierNotes}
-                  onChangeText={viewModel.setSupplierNotes}
-                  placeholder="সাপ্লাইয়ার সম্পর্কে অতিরিক্ত তথ্য"
-                  multiline
-                />
-              </View>
-            </ScrollView>
-            
-            <View style={styles.modalActions}>
-              <TouchableOpacity 
-                style={styles.cancelButton}
-                onPress={viewModel.resetFormAndCloseModal}
-              >
-                <Text style={styles.cancelButtonText}>বাতিল</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.saveButton}
-                onPress={viewModel.handleSubmit}
-              >
-                <Text style={styles.saveButtonText}>সংরক্ষণ করুন</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
@@ -510,229 +443,205 @@ export default function SupplierScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
-  },
-  headerButton: {
-    padding: 8,
-  },
-  searchContainer: {
-    padding: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    backgroundColor: '#f5f5f5',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f5f5f5',
   },
   loadingText: {
-    marginTop: 16,
+    marginTop: 10,
     fontSize: 16,
-    color: '#666',
+    color: '#2c3e50',
   },
-  emptyContainer: {
-    flex: 1,
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  addButton: {
+    backgroundColor: '#2c3e50',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-  },
-  emptyText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 20,
-  },
-  addSupplierButton: {
-    backgroundColor: '#1565C0',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
+    marginLeft: 10,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
-    shadowRadius: 1.41,
+    shadowRadius: 1.5,
   },
-  addSupplierButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  supplierList: {
+  suppliersList: {
     padding: 16,
   },
-  supplierItem: {
-    backgroundColor: 'white',
-    borderRadius: 8,
+  supplierCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
+    marginBottom: 16,
     elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
-  supplierInfo: {
-    flex: 1,
+  supplierHeader: {
+    marginBottom: 12,
   },
   supplierName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#344955',
-    marginBottom: 6,
+    color: '#2c3e50',
   },
   supplierCompany: {
     fontSize: 14,
+    color: '#3498db',
     fontWeight: '500',
-    color: '#1565C0',
+    marginTop: 2,
+  },
+  supplierDetails: {
+    marginBottom: 12,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  detailText: {
+    fontSize: 14,
+    color: '#555',
+    marginLeft: 8,
+  },
+  notesContainer: {
+    backgroundColor: '#f8f9fa',
+    padding: 10,
+    borderRadius: 6,
+    marginBottom: 12,
+  },
+  notesLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#2c3e50',
     marginBottom: 4,
   },
-  supplierDetail: {
+  notesText: {
     fontSize: 14,
-    color: '#4A6572',
-    marginBottom: 4,
+    color: '#555',
   },
-  unpaidAmount: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#E57373',
-    marginTop: 4,
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  balanceAmount: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4CAF50',
-    marginTop: 4,
-  },
-  supplierActions: {
-    justifyContent: 'space-around',
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    flex: 1,
+    marginHorizontal: 4,
   },
   editButton: {
-    padding: 8,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 20,
-    marginBottom: 8,
+    backgroundColor: '#3498db',
   },
   deleteButton: {
-    padding: 8,
-    backgroundColor: '#ffebee',
-    borderRadius: 20,
+    backgroundColor: '#e74c3c',
   },
-  fabButton: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    backgroundColor: '#1565C0',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 4,
+  },
+  emptyContainer: {
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    justifyContent: 'center',
+    padding: 40,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#7f8c8d',
+    marginTop: 12,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  emptyButton: {
+    backgroundColor: '#3498db',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 6,
+  },
+  emptyButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
   },
   modalContainer: {
     flex: 1,
-    justifyContent: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
+  modalScrollContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: 16,
+  },
   modalContent: {
-    backgroundColor: 'white',
-    margin: 20,
-    borderRadius: 8,
-    maxHeight: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    elevation: 5,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-    elevation: 5,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#344955',
-  },
-  modalScrollView: {
-    padding: 16,
-  },
-  formGroup: {
+    color: '#2c3e50',
     marginBottom: 16,
+    textAlign: 'center',
   },
-  formLabel: {
-    fontSize: 14,
-    color: '#4A6572',
-    marginBottom: 4,
-    fontWeight: '500',
-  },
-  formInput: {
-    backgroundColor: '#f9f9f9',
-    borderWidth: 1,
-    borderColor: '#ddd',
+  input: {
+    backgroundColor: '#f5f5f5',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
+    marginBottom: 12,
   },
-  multilineInput: {
-    height: 80,
+  textArea: {
+    height: 100,
     textAlignVertical: 'top',
   },
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
+    marginTop: 8,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: 6,
   },
   cancelButton: {
-    backgroundColor: '#f5f5f5',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    width: '48%',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    color: '#666',
-    fontWeight: '500',
+    backgroundColor: '#95a5a6',
   },
   saveButton: {
-    backgroundColor: '#1565C0',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    width: '48%',
-    alignItems: 'center',
+    backgroundColor: '#2ecc71',
   },
-  saveButtonText: {
+  buttonText: {
+    color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
-    color: 'white',
+    fontWeight: '500',
   },
 });

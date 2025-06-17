@@ -9,6 +9,9 @@ import HomeScreen from "./screens/HomeScreen";
 import ProductSelectionScreen from "./screens/ProductSelectionScreen";
 import ProductManagementScreen from "./screens/ProductManagementScreen";
 import CartScreen from "./screens/CartScreen";
+import CustomerManagementScreen from "./screens/CustomerManagementScreen";
+import SupplierScreen from "./screens/SupplierScreen";
+import ReportScreen from "./screens/ReportScreen";
 import CustomDrawerContent from './components/CustomDrawerContent';
 import { ProductProvider } from './context/ProductContext';
 import { CartProvider } from './context/CartContext';
@@ -27,6 +30,9 @@ function MainStack() {
       <Stack.Screen name="ProductSelection" component={ProductSelectionScreen} />
       <Stack.Screen name="ProductManagement" component={ProductManagementScreen} />
       <Stack.Screen name="Cart" component={CartScreen} />
+      <Stack.Screen name="Customers" component={CustomerManagementScreen} />
+      <Stack.Screen name="Suppliers" component={SupplierScreen} />
+      <Stack.Screen name="Reports" component={ReportScreen} />
       {/* Add other screens here */}
     </Stack.Navigator>
   );

@@ -9,14 +9,12 @@ interface CustomerContextType {
   customers: CustomerModel[];
   loading: boolean;
   error: string | null;
-  addCustomer: (customer: Omit<CustomerModel, 'id' | 'totalPurchases' | 'history'>) => Promise<CustomerModel>;
+  addCustomer: (customer: CustomerModel) => Promise<CustomerModel>;
   updateCustomer: (customer: CustomerModel) => Promise<void>;
   deleteCustomer: (id: string) => Promise<void>;
   getCustomerById: (id: string) => CustomerModel | undefined;
-  addCredit: (customerId: string, amount: number, dueDate?: number, notes?: string) => Promise<void>;
-  recordPayment: (customerId: string, amount: number, notes?: string) => Promise<void>;
+  recordPayment: (customerId: string, paymentData: CreditHistoryItem) => Promise<void>;
   getTopDebtors: () => CustomerModel[];
-  getUpcomingDues: (daysThreshold: number) => CreditHistoryItem[];
 }
 
 // Create the context
@@ -63,18 +61,10 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [customers, loading]);
 
   // Add a new customer
-  const addCustomer = useCallback(async (customerData: Omit<CustomerModel, 'id' | 'totalPurchases' | 'history'>) => {
+  const addCustomer = useCallback(async (customerData: CustomerModel) => {
     try {
-      const newCustomer: CustomerModel = {
-        ...customerData,
-        id: generateUniqueId(),
-        totalPurchases: 0,
-        outstandingCredit: 0,
-        history: [],
-      };
-      
-      setCustomers(prevCustomers => [...prevCustomers, newCustomer]);
-      return newCustomer;
+      setCustomers(prevCustomers => [...prevCustomers, customerData]);
+      return customerData;
     } catch (e) {
       setError('Failed to add customer: ' + e.message);
       throw new Error('Failed to add customer');
@@ -100,50 +90,18 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return customers.find(customer => customer.id === id);
   }, [customers]);
 
-  // Add credit (from a purchase) to a customer account
-  const addCredit = useCallback(async (customerId: string, amount: number, dueDate?: number, notes?: string) => {
-    setCustomers(prevCustomers => 
-      prevCustomers.map(customer => {
-        if (customer.id === customerId) {
-          const creditRecord: CreditHistoryItem = {
-            id: generateUniqueId(),
-            date: Date.now(),
-            amount,
-            type: 'purchase',
-            notes,
-            dueDate,
-          };
-          
-          return {
-            ...customer,
-            outstandingCredit: customer.outstandingCredit + amount,
-            history: [...customer.history, creditRecord],
-            totalPurchases: customer.totalPurchases + 1,
-            lastPurchaseDate: Date.now()
-          };
-        }
-        return customer;
-      })
-    );
-  }, []);
-
   // Record a payment from a customer
-  const recordPayment = useCallback(async (customerId: string, amount: number, notes?: string) => {
+  const recordPayment = useCallback(async (customerId: string, paymentData: CreditHistoryItem) => {
     setCustomers(prevCustomers => 
       prevCustomers.map(customer => {
         if (customer.id === customerId) {
-          const paymentRecord: CreditHistoryItem = {
-            id: generateUniqueId(),
-            date: Date.now(),
-            amount,
-            type: 'payment',
-            notes,
-          };
+          const currentBalance = customer.outstandingBalance || 0;
+          const newBalance = Math.max(0, currentBalance - paymentData.amount);
           
           return {
             ...customer,
-            outstandingCredit: Math.max(0, customer.outstandingCredit - amount),
-            history: [...customer.history, paymentRecord]
+            outstandingBalance: newBalance,
+            creditHistory: [...(customer.creditHistory || []), paymentData]
           };
         }
         return customer;
@@ -151,35 +109,12 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     );
   }, []);
 
-  // Get top debtors (customers with highest outstanding credit)
+  // Get top debtors (customers with highest outstanding balance)
   const getTopDebtors = useCallback(() => {
     return [...customers]
-      .filter(customer => customer.outstandingCredit > 0)
-      .sort((a, b) => b.outstandingCredit - a.outstandingCredit)
+      .filter(customer => (customer.outstandingBalance || 0) > 0)
+      .sort((a, b) => (b.outstandingBalance || 0) - (a.outstandingBalance || 0))
       .slice(0, 5);
-  }, [customers]);
-
-  // Get upcoming due payments
-  const getUpcomingDues = useCallback((daysThreshold: number) => {
-    const now = Date.now();
-    const thresholdTime = now + (daysThreshold * 24 * 60 * 60 * 1000);
-    
-    return customers
-      .flatMap(customer => 
-        customer.history
-          .filter(item => 
-            item.type === 'purchase' && 
-            item.dueDate && 
-            item.dueDate > now && 
-            item.dueDate <= thresholdTime
-          )
-          .map(item => ({
-            ...item,
-            customerName: customer.name,
-            customerPhone: customer.phone
-          }))
-      )
-      .sort((a, b) => (a.dueDate || 0) - (b.dueDate || 0));
   }, [customers]);
 
   // Context value
@@ -191,10 +126,8 @@ export const CustomerProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     updateCustomer,
     deleteCustomer,
     getCustomerById,
-    addCredit,
     recordPayment,
     getTopDebtors,
-    getUpcomingDues,
   };
 
   return <CustomerContext.Provider value={value}>{children}</CustomerContext.Provider>;
