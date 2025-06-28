@@ -12,6 +12,7 @@ import CartScreen from "./screens/CartScreen";
 import CustomerManagementScreen from "./screens/CustomerManagementScreen";
 import SupplierScreen from "./screens/SupplierScreen";
 import ReportScreen from "./screens/ReportScreen";
+import MaterialCalculatorScreen from "./screens/MaterialCalculatorScreen";
 import CustomDrawerContent from './components/CustomDrawerContent';
 import { ProductProvider } from './context/ProductContext';
 import { CartProvider } from './context/CartContext';
@@ -21,39 +22,27 @@ import { CustomerProvider } from './context/CustomerContext';
 const Stack = createNativeStackNavigator();
 const Drawer = createDrawerNavigator();
 
-function MainStack() {
-  return (
-    <Stack.Navigator screenOptions={{
-      headerShown: false
-    }}>
-      <Stack.Screen name="Home" component={HomeScreen} />
-      <Stack.Screen name="ProductSelection" component={ProductSelectionScreen} />
-      <Stack.Screen name="ProductManagement" component={ProductManagementScreen} />
-      <Stack.Screen name="Cart" component={CartScreen} />
-      <Stack.Screen name="Customers" component={CustomerManagementScreen} />
-      <Stack.Screen name="Suppliers" component={SupplierScreen} />
-      <Stack.Screen name="Reports" component={ReportScreen} />
-      {/* Add other screens here */}
-    </Stack.Navigator>
-  );
-}
-
-function DrawerNavigator() {
+function MainDrawerNavigator() {
   return (
     <Drawer.Navigator
       screenOptions={{
         headerShown: false,
         drawerType: 'front',
-        swipeEnabled: false, // Disable swipe to open
-        gestureEnabled: false, // Disable gestures
-        swipeEdgeWidth: 0, // Set edge width to 0
+        swipeEnabled: Platform.OS !== 'web', // Enable swipe on mobile only
         drawerStyle: {
           width: '75%', // Width of the drawer
         },
       }}
       drawerContent={(props) => <CustomDrawerContent {...props} />}
     >
-      <Drawer.Screen name="HomeDrawer" component={MainStack} />
+      <Drawer.Screen name="Home" component={HomeScreen} />
+      <Drawer.Screen name="ProductSelection" component={ProductSelectionScreen} />
+      <Drawer.Screen name="ProductManagement" component={ProductManagementScreen} />
+      <Drawer.Screen name="Cart" component={CartScreen} />
+      <Drawer.Screen name="Suppliers" component={SupplierScreen} />
+      <Drawer.Screen name="Customers" component={CustomerManagementScreen} />
+      <Drawer.Screen name="MaterialCalculator" component={MaterialCalculatorScreen} />
+      <Drawer.Screen name="Reports" component={ReportScreen} />
     </Drawer.Navigator>
   );
 }
@@ -67,7 +56,7 @@ export default function App() {
             <CartProvider>
               <Toaster />
               <NavigationContainer>
-                <DrawerNavigator />
+                <MainDrawerNavigator />
               </NavigationContainer>
             </CartProvider>
           </ProductProvider>

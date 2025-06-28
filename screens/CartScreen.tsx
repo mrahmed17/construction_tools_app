@@ -8,7 +8,8 @@ import {
   TextInput,
   Alert,
   Modal,
-  SafeAreaView
+  SafeAreaView,
+  Switch
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -20,8 +21,8 @@ import Header from '../components/Header';
 // MVVM architecture: View Model for Cart operations
 const useCartViewModel = () => {
   const navigation = useNavigation();
-  const { cartItems, updateCartItemQuantity, removeFromCart, clearCart, calculateTotal, calculateProfit } = useCart();
-  const { addCredit } = useCustomer();
+  const { cartItems, updateCartItemQuantity, removeFromCart, clearCart, calculateTotal, calculateProfit, createOrder } = useCart();
+  const { customers, addCustomer, recordPayment } = useCustomer();
 
   // Customer info
   const [customerName, setCustomerName] = useState('');
@@ -29,7 +30,9 @@ const useCartViewModel = () => {
   const [customerAddress, setCustomerAddress] = useState('');
   
   // Payment info
+  const [discountType, setDiscountType] = useState<'percent' | 'amount'>('percent');
   const [discountPercent, setDiscountPercent] = useState('0');
+  const [discountFixedAmount, setDiscountFixedAmount] = useState('0');
   const [discountAmount, setDiscountAmount] = useState(0);
   const [totalAmount, setTotalAmount] = useState(0);
   const [advanceAmount, setAdvanceAmount] = useState('0');
@@ -43,43 +46,55 @@ const useCartViewModel = () => {
     if (!cartItems) return;
     
     const subTotal = calculateTotal();
-    const discount = (parseFloat(discountPercent) / 100) * subTotal;
+    let discount = 0;
+    
+    if (discountType === 'percent') {
+      discount = (parseFloat(discountPercent) / 100) * subTotal;
+    } else {
+      discount = parseFloat(discountFixedAmount) || 0;
+    }
+    
     setDiscountAmount(discount);
     
-    const total = subTotal - discount;
+    const total = Math.max(0, subTotal - discount);
     setTotalAmount(total);
     
     const advance = parseFloat(advanceAmount) || 0;
     setDueAmount(Math.max(0, total - advance));
     
-  }, [cartItems, discountPercent, advanceAmount, calculateTotal]);
+  }, [cartItems, discountType, discountPercent, discountFixedAmount, advanceAmount, calculateTotal]);
+
+  // Toggle discount type
+  const toggleDiscountType = useCallback(() => {
+    setDiscountType(prev => prev === 'percent' ? 'amount' : 'percent');
+  }, []);
 
   // Increase item quantity
-  const handleIncreaseQuantity = useCallback((id) => {
+  const handleIncreaseQuantity = useCallback((productId) => {
     if (!cartItems) return;
-    const item = cartItems.find(item => item.id === id);
+    const item = cartItems.find(item => item.productId === productId);
     if (item) {
-      updateCartItemQuantity(id, item.quantity + 1);
+      updateCartItemQuantity(productId, item.quantity + 1);
     }
   }, [cartItems, updateCartItemQuantity]);
 
   // Decrease item quantity
-  const handleDecreaseQuantity = useCallback((id) => {
+  const handleDecreaseQuantity = useCallback((productId) => {
     if (!cartItems) return;
-    const item = cartItems.find(item => item.id === id);
+    const item = cartItems.find(item => item.productId === productId);
     if (item && item.quantity > 1) {
-      updateCartItemQuantity(id, item.quantity - 1);
+      updateCartItemQuantity(productId, item.quantity - 1);
     }
   }, [cartItems, updateCartItemQuantity]);
 
   // Remove item from cart
-  const handleRemoveItem = useCallback((id) => {
+  const handleRemoveItem = useCallback((productId) => {
     Alert.alert(
       'নিশ্চিত করুন',
       'আপনি কি এই পণ্যটি কার্ট থেকে সরাতে চান?',
       [
         { text: 'না', style: 'cancel' },
-        { text: 'হ্যাঁ', onPress: () => removeFromCart(id) }
+        { text: 'হ্যাঁ', onPress: () => removeFromCart(productId) }
       ]
     );
   }, [removeFromCart]);
@@ -114,80 +129,75 @@ const useCartViewModel = () => {
     }
     
     try {
-      // Create transaction record
-      const transaction = {
-        id: Date.now().toString(),
+      // Create order data
+      const orderData = {
         date: new Date().toISOString(),
         customerName,
-        customerMobile,
-        customerAddress,
+        customerPhone: customerMobile,
         items: cartItems,
-        subtotal: calculateTotal(),
-        discountPercent: parseFloat(discountPercent),
-        discountAmount,
-        total: totalAmount,
-        advance: parseFloat(advanceAmount) || 0,
-        due: dueAmount,
-        profit: calculateProfit()
+        totalAmount,
+        discount: discountAmount,
+        paidAmount: parseFloat(advanceAmount) || 0,
+        dueAmount,
+        status: 'completed' as const
       };
       
-      // Save to AsyncStorage
-      const savedTransactions = await AsyncStorage.getItem('recentTransactions');
-      const transactions = savedTransactions ? JSON.parse(savedTransactions) : [];
-      transactions.unshift(transaction);
-      await AsyncStorage.setItem('recentTransactions', JSON.stringify(transactions));
+      // Create order
+      const newOrder = await createOrder(orderData);
       
       // If there's a due amount and customer mobile is provided, add to customer credit
       if (dueAmount > 0 && customerMobile) {
         try {
-          // Find or create customer
-          const customersString = await AsyncStorage.getItem('customers');
-          const customers = customersString ? JSON.parse(customersString) : [];
-          
+          // Find existing customer
           let customer = customers.find(c => c.phone === customerMobile);
           
           if (customer) {
-            // Add credit to existing customer
-            await addCredit(customer.id, dueAmount, Date.now() + (30 * 24 * 60 * 60 * 1000), `বিল #${transaction.id}`);
+            // Record payment for existing customer
+            await recordPayment(customer.id, {
+              id: Date.now().toString(),
+              amount: dueAmount,
+              date: new Date().toISOString(),
+              type: 'purchase',
+              description: `বিল #${newOrder.id}`
+            });
           } else if (customerName) {
-            // Create new customer and add credit
+            // Create new customer
             const newCustomer = {
               id: Date.now().toString(),
               name: customerName,
               phone: customerMobile,
               address: customerAddress,
-              totalPurchases: 1,
-              outstandingCredit: dueAmount,
-              history: [
+              creditLimit: dueAmount * 2, // Set a default credit limit
+              outstandingBalance: dueAmount,
+              creditHistory: [
                 {
                   id: Date.now().toString(),
-                  date: Date.now(),
                   amount: dueAmount,
+                  date: new Date().toISOString(),
                   type: 'purchase',
-                  notes: `বিল #${transaction.id}`,
-                  dueDate: Date.now() + (30 * 24 * 60 * 60 * 1000)
+                  description: `বিল #${newOrder.id}`
                 }
               ],
-              lastPurchaseDate: Date.now()
+              createdAt: new Date().toISOString()
             };
             
-            customers.push(newCustomer);
-            await AsyncStorage.setItem('customers', JSON.stringify(customers));
+            await addCustomer(newCustomer);
           }
         } catch (error) {
           console.error('Error updating customer credit:', error);
         }
       }
       
-      // Clear cart and close modal
-      clearCart();
+      // Close modal
       setCheckoutModalVisible(false);
       
       // Reset form
       setCustomerName('');
       setCustomerMobile('');
       setCustomerAddress('');
+      setDiscountType('percent');
       setDiscountPercent('0');
+      setDiscountFixedAmount('0');
       setAdvanceAmount('0');
       
       // Show success message
@@ -207,28 +217,27 @@ const useCartViewModel = () => {
     customerMobile, 
     customerAddress, 
     cartItems, 
-    calculateTotal, 
-    discountPercent, 
+    totalAmount,
     discountAmount, 
-    totalAmount, 
     advanceAmount, 
     dueAmount, 
-    calculateProfit, 
-    addCredit, 
-    clearCart, 
+    createOrder,
+    customers,
+    recordPayment,
+    addCustomer,
     navigation
   ]);
 
   // Calculate profit amount for a single item
   const calculateItemProfit = useCallback((item) => {
-    const sellingPrice = item.salePrice || 0;
-    const purchasePrice = item.purchasePrice || 0;
+    const sellingPrice = item.product.sellingPrice || 0;
+    const purchasePrice = item.product.purchasePrice || 0;
     return (sellingPrice - purchasePrice) * item.quantity;
   }, []);
   
   // Format currency
   const formatCurrency = useCallback((amount) => {
-    return `৳${amount.toLocaleString('bn-BD')}`;
+    return `৳${amount.toLocaleString()}`;
   }, []);
 
   return {
@@ -239,8 +248,13 @@ const useCartViewModel = () => {
     setCustomerMobile,
     customerAddress,
     setCustomerAddress,
+    discountType,
+    setDiscountType,
+    toggleDiscountType,
     discountPercent,
     setDiscountPercent,
+    discountFixedAmount,
+    setDiscountFixedAmount,
     discountAmount,
     totalAmount,
     advanceAmount,
@@ -296,25 +310,25 @@ export default function CartScreen() {
             
             <ScrollView style={styles.cartItemsContainer}>
               {viewModel.cartItems.map((item) => (
-                <View key={item.id} style={styles.cartItem}>
+                <View key={item.productId} style={styles.cartItem}>
                   <View style={styles.itemInfo}>
                     <View>
-                      <Text style={styles.itemCategory}>{item.category}</Text>
+                      <Text style={styles.itemCategory}>{item.product.category}</Text>
                       <Text style={styles.itemDetails}>
-                        {item.company ? `${item.company}, ` : ''}
-                        {item.type ? `${item.type}, ` : ''}
-                        {item.color ? `${item.color}, ` : ''}
-                        {item.thickness ? `${item.thickness} মিমি, ` : ''}
-                        {item.size}
+                        {item.product.company ? `${item.product.company}, ` : ''}
+                        {item.product.type ? `${item.product.type}, ` : ''}
+                        {item.product.color ? `${item.product.color}, ` : ''}
+                        {item.product.thickness ? `${item.product.thickness} মিমি, ` : ''}
+                        {item.product.size}
                       </Text>
                     </View>
                     
                     <View style={styles.priceContainer}>
                       <Text style={styles.itemPrice}>
-                        {viewModel.formatCurrency(item.salePrice || 0)} × {item.quantity}
+                        {viewModel.formatCurrency(item.product.sellingPrice || 0)} × {item.quantity}
                       </Text>
                       <Text style={styles.itemTotalPrice}>
-                        {viewModel.formatCurrency((item.salePrice || 0) * item.quantity)}
+                        {viewModel.formatCurrency((item.product.sellingPrice || 0) * item.quantity)}
                       </Text>
                     </View>
                   </View>
@@ -323,7 +337,7 @@ export default function CartScreen() {
                     <View style={styles.quantityControl}>
                       <TouchableOpacity
                         style={styles.quantityButton}
-                        onPress={() => viewModel.handleDecreaseQuantity(item.id)}
+                        onPress={() => viewModel.handleDecreaseQuantity(item.productId)}
                       >
                         <Text style={styles.quantityButtonText}>-</Text>
                       </TouchableOpacity>
@@ -332,7 +346,7 @@ export default function CartScreen() {
                       
                       <TouchableOpacity
                         style={styles.quantityButton}
-                        onPress={() => viewModel.handleIncreaseQuantity(item.id)}
+                        onPress={() => viewModel.handleIncreaseQuantity(item.productId)}
                       >
                         <Text style={styles.quantityButtonText}>+</Text>
                       </TouchableOpacity>
@@ -340,7 +354,7 @@ export default function CartScreen() {
                     
                     <TouchableOpacity
                       style={styles.removeButton}
-                      onPress={() => viewModel.handleRemoveItem(item.id)}
+                      onPress={() => viewModel.handleRemoveItem(item.productId)}
                     >
                       <MaterialIcons name="delete" size={20} color="#fff" />
                     </TouchableOpacity>
@@ -430,14 +444,44 @@ export default function CartScreen() {
                 
                 <Text style={styles.modalSectionTitle}>অর্থ প্রদান</Text>
                 
-                <Text style={styles.inputLabel}>ডিসকাউন্ট (%)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={viewModel.discountPercent}
-                  onChangeText={viewModel.setDiscountPercent}
-                  placeholder="ডিসকাউন্ট শতাংশ"
-                  keyboardType="numeric"
-                />
+                <View style={styles.discountTypeContainer}>
+                  <Text style={styles.inputLabel}>ডিসকাউন্ট টাইপ</Text>
+                  <View style={styles.discountTypeSelector}>
+                    <Text style={styles.discountTypeLabel}>
+                      {viewModel.discountType === 'percent' ? 'শতাংশ (%)' : 'নির্দিষ্ট পরিমাণ (৳)'}
+                    </Text>
+                    <Switch
+                      value={viewModel.discountType === 'amount'}
+                      onValueChange={viewModel.toggleDiscountType}
+                      trackColor={{ false: '#767577', true: '#81b0ff' }}
+                      thumbColor={viewModel.discountType === 'amount' ? '#2196f3' : '#f4f3f4'}
+                    />
+                  </View>
+                </View>
+                
+                {viewModel.discountType === 'percent' ? (
+                  <>
+                    <Text style={styles.inputLabel}>ডিসকাউন্ট (%)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={viewModel.discountPercent}
+                      onChangeText={viewModel.setDiscountPercent}
+                      placeholder="ডিসকাউন্ট শতাংশ"
+                      keyboardType="numeric"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.inputLabel}>ডিসকাউন্ট পরিমাণ (৳)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={viewModel.discountFixedAmount}
+                      onChangeText={viewModel.setDiscountFixedAmount}
+                      placeholder="ডিসকাউন্ট পরিমাণ"
+                      keyboardType="numeric"
+                    />
+                  </>
+                )}
                 
                 <Text style={styles.inputLabel}>অগ্রিম (৳)</Text>
                 <TextInput
@@ -455,7 +499,9 @@ export default function CartScreen() {
                   </View>
                   
                   <View style={styles.paymentRow}>
-                    <Text style={styles.paymentLabel}>ডিসকাউন্ট:</Text>
+                    <Text style={styles.paymentLabel}>
+                      ডিসকাউন্ট {viewModel.discountType === 'percent' ? `(${viewModel.discountPercent}%)` : ''}:
+                    </Text>
                     <Text style={styles.paymentValue}>- {viewModel.formatCurrency(viewModel.discountAmount)}</Text>
                   </View>
                   
@@ -734,6 +780,21 @@ const styles = StyleSheet.create({
   textArea: {
     height: 80,
     textAlignVertical: 'top',
+  },
+  discountTypeContainer: {
+    marginBottom: 12,
+  },
+  discountTypeSelector: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    padding: 10,
+    borderRadius: 6,
+  },
+  discountTypeLabel: {
+    fontSize: 14,
+    color: '#333',
   },
   paymentSummary: {
     backgroundColor: '#f5f5f5',

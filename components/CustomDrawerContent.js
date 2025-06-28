@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
-import { DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
+import { DrawerContentScrollView } from '@react-navigation/drawer';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { CommonActions } from '@react-navigation/native';
 
 export default function CustomDrawerContent(props) {
   const { navigation } = props;
@@ -15,9 +16,8 @@ export default function CustomDrawerContent(props) {
     { name: 'কার্ট', icon: 'cart-outline', iconType: 'ionicon', screen: 'Cart' },
     { name: 'সাপ্লাইয়ার', icon: 'people-outline', iconType: 'ionicon', screen: 'Suppliers' },
     { name: 'কাস্টমার', icon: 'person-outline', iconType: 'ionicon', screen: 'Customers' },
-    { name: 'বিক্রয়', icon: 'cash-register', iconType: 'fontawesome', screen: 'Sales' },
+    { name: 'নির্মাণ ক্যালকুলেটর', icon: 'calculator-outline', iconType: 'ionicon', screen: 'MaterialCalculator' },
     { name: 'রিপোর্ট', icon: 'bar-chart-outline', iconType: 'ionicon', screen: 'Reports' },
-    { name: 'সেটিংস', icon: 'settings-outline', iconType: 'ionicon', screen: 'Settings' },
   ];
 
   // Render the appropriate icon based on the icon type
@@ -33,6 +33,18 @@ export default function CustomDrawerContent(props) {
     }
   };
 
+  const handleNavigation = (screenName) => {
+    // Close drawer first
+    navigation.closeDrawer();
+    
+    // Use CommonActions to ensure consistent navigation behavior across platforms
+    navigation.dispatch(
+      CommonActions.navigate({
+        name: screenName,
+      })
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -45,10 +57,8 @@ export default function CustomDrawerContent(props) {
           <TouchableOpacity
             key={index}
             style={styles.menuItem}
-            onPress={() => {
-              navigation.navigate(item.screen);
-              navigation.closeDrawer(); // Close drawer after navigation
-            }}
+            onPress={() => handleNavigation(item.screen)}
+            activeOpacity={0.7}
           >
             {renderIcon(item)}
             <Text style={styles.menuText}>{item.name}</Text>

@@ -1,12 +1,48 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import Header from '../components/Header';
+import { useProducts } from '../context/ProductContext';
+import { useCart } from '../context/CartContext';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
+  const { products, getLowStockProducts } = useProducts();
+  const { orders } = useCart();
+  const [lowStockCount, setLowStockCount] = useState(0);
+  const [todaySales, setTodaySales] = useState(0);
+
+  useEffect(() => {
+    // Get low stock products
+    const lowStockProducts = getLowStockProducts();
+    setLowStockCount(lowStockProducts.length);
+    
+    // Show alert for low stock products if any
+    if (lowStockProducts.length > 0) {
+      Alert.alert(
+        'কম স্টক সতর্কতা',
+        `${lowStockProducts.length}টি পণ্যের স্টক কম রয়েছে। বিস্তারিত দেখতে পণ্য ব্যবস্থাপনা পেজে যান।`,
+        [
+          { text: 'পরে দেখব', style: 'cancel' },
+          { 
+            text: 'এখন দেখব', 
+            onPress: () => navigation.navigate('ProductManagement' as never) 
+          }
+        ]
+      );
+    }
+    
+    // Calculate today's sales
+    const today = new Date().toDateString();
+    const todayOrders = orders?.filter(order => 
+      new Date(order.date).toDateString() === today
+    ) || [];
+    
+    const totalSales = todayOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+    setTodaySales(totalSales);
+  }, [products, orders]);
 
   // Dashboard menu items
   const menuItems = [
@@ -51,6 +87,14 @@ export default function HomeScreen() {
       description: 'কাস্টমারদের তথ্য ব্যবস্থাপনা করুন'
     },
     { 
+      name: 'নির্মাণ ক্যালকুলেটর', 
+      icon: 'calculator-outline', 
+      iconType: 'ionicon', 
+      screen: 'MaterialCalculator',
+      color: '#009688',
+      description: 'নির্মাণ সামগ্রীর পরিমাণ গণনা করুন'
+    },
+    { 
       name: 'রিপোর্ট', 
       icon: 'bar-chart-outline', 
       iconType: 'ionicon', 
@@ -83,6 +127,21 @@ export default function HomeScreen() {
           <Text style={styles.welcomeText}>ঘর তৈরির সরঞ্জাম ইনভেন্টরি ম্যানেজমেন্ট সিস্টেমে আপনাকে স্বাগতম। নিচের অপশনগুলি থেকে একটি বেছে নিন।</Text>
         </View>
 
+        {lowStockCount > 0 && (
+          <TouchableOpacity 
+            style={styles.alertCard}
+            onPress={() => navigation.navigate('ProductManagement' as never)}
+          >
+            <View style={styles.alertIconContainer}>
+              <Ionicons name="warning-outline" size={24} color="#fff" />
+            </View>
+            <View style={styles.alertTextContainer}>
+              <Text style={styles.alertTitle}>কম স্টক সতর্কতা</Text>
+              <Text style={styles.alertText}>{lowStockCount}টি পণ্যের স্টক কম রয়েছে। বিস্তারিত দেখতে এখানে ক্লিক করুন।</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
         <View style={styles.menuGrid}>
           {menuItems.map((item, index) => (
             <TouchableOpacity
@@ -104,15 +163,17 @@ export default function HomeScreen() {
           
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>১২৫</Text>
+              <Text style={styles.statValue}>{products?.length || 0}</Text>
               <Text style={styles.statLabel}>মোট পণ্য</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>১৮</Text>
+              <Text style={[styles.statValue, lowStockCount > 0 ? styles.alertValue : {}]}>
+                {lowStockCount}
+              </Text>
               <Text style={styles.statLabel}>কম স্টক</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>৩৫</Text>
+              <Text style={styles.statValue}>৳ {todaySales.toLocaleString()}</Text>
               <Text style={styles.statLabel}>আজকের বিক্রয়</Text>
             </View>
           </View>
@@ -152,6 +213,42 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#ecf0f1',
     lineHeight: 22,
+  },
+  alertCard: {
+    backgroundColor: '#e74c3c',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  alertIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  alertTextContainer: {
+    flex: 1,
+  },
+  alertTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  alertText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    lineHeight: 18,
   },
   menuGrid: {
     flexDirection: 'row',
@@ -220,6 +317,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#2c3e50',
     marginBottom: 4,
+  },
+  alertValue: {
+    color: '#e74c3c',
   },
   statLabel: {
     fontSize: 14,
